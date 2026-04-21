@@ -23,7 +23,7 @@ class HomeScreen extends StatelessWidget {
               // ── Logo + Nom app ──
               Row(
                 children: [
-                  Image.asset('assets/images/njangi_logo.PNG', height: 50),
+                  Image.asset('assets/images/njangi_logo.png', height: 50),
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

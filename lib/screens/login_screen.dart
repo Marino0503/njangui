@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset('assets/images/njangi_logo.PNG', height: 80),
+                  Image.asset('assets/images/njangi_logo.png', height: 80),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +115,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   hintText: 'Entrez le numéro',
                   // ← Indicatif Cameroun affiché en préfixe
                   prefixIcon: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                     child: Text(
                       '🇨🇲 +237',
                       style: TextStyle(fontSize: 16, color: Colors.black87),
