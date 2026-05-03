@@ -4,6 +4,8 @@ import '../services/user_service.dart';
 import '../models/tontine.dart';
 import '../widgets/tontine_card.dart';
 import 'detail_tontine_screen.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -95,57 +97,63 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── Liste depuis Firestore ──
-              StreamBuilder<List<Tontine>>(
-                stream: FirestoreService().getTontines(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF2E9E6E),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Erreur : ${snapshot.error}',
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    );
-                  }
-
-                  final tontines = snapshot.data ?? [];
-
-                  if (tontines.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'Aucune tontine pour l\'instant',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: tontines.length,
-                    itemBuilder: (context, index) {
-                      return TontineCard(
-                        tontine: tontines[index],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  DetailTontineScreen(tontine: tontines[index]),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
+              RefreshIndicator(
+                color: const Color(0xFF2E9E6E),
+                onRefresh: () async {
+                  await Future.delayed(const Duration(seconds: 1));
                 },
+                child: StreamBuilder<List<Tontine>>(
+                  stream: FirestoreService().getTontines(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF2E9E6E),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return ErrorState(
+                        message:
+                            'Impossible de charger les tontines.\nVérifiez votre connexion.',
+                        onReessayer: () {},
+                      );
+                    }
+
+                    final tontines = snapshot.data ?? [];
+
+                    if (tontines.isEmpty) {
+                      return EmptyState(
+                        icon: Icons.groups_outlined,
+                        titre: 'Pas encore de tontine',
+                        message:
+                            'Allez dans l\'onglet Tontines\npour en créer une !',
+                      );
+                    }
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: tontines.length,
+                      itemBuilder: (context, index) {
+                        return TontineCard(
+                          tontine: tontines[index],
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailTontineScreen(
+                                  tontine: tontines[index],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
 
               const SizedBox(height: 20),

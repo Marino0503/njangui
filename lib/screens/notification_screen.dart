@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -56,11 +58,10 @@ class NotificationScreen extends StatelessWidget {
 
                   // Erreur
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Erreur : ${snapshot.error}',
-                        style: const TextStyle(color: Colors.red),
-                      ),
+                    return ErrorState(
+                      message:
+                          'Impossible de charger les notifications.\nVérifiez votre connexion.',
+                      onReessayer: () {},
                     );
                   }
 
@@ -68,22 +69,11 @@ class NotificationScreen extends StatelessWidget {
 
                   // Liste vide
                   if (notifications.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.notifications_none,
-                            size: 70,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Aucune notification',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        ],
-                      ),
+                    return EmptyState(
+                      icon: Icons.notifications_none,
+                      titre: 'Aucune notification',
+                      message:
+                          'Vous n\'avez pas encore de notifications.\nElles apparaîtront ici !',
                     );
                   }
 

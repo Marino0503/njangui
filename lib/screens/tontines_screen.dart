@@ -5,6 +5,8 @@ import '../widgets/tontine_card.dart';
 import 'create_tontine_screen.dart';
 import 'rejoindre_tontine_screen.dart';
 import 'detail_tontine_screen.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/error_state.dart';
 
 class TontinesScreen extends StatelessWidget {
   const TontinesScreen({super.key});
@@ -51,75 +53,77 @@ class TontinesScreen extends StatelessWidget {
 
               // ── Liste des tontines depuis Firestore ──
               Expanded(
-                child: StreamBuilder<List<Tontine>>(
-                  stream: FirestoreService().getTontines(),
-                  builder: (context, snapshot) {
-                    // Chargement
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF2E9E6E),
-                        ),
-                      );
-                    }
+                child: RefreshIndicator(
+                  color: const Color(0xFF2E9E6E),
+                  onRefresh: () async {
+                    // Simule un rafraîchissement
+                    await Future.delayed(const Duration(seconds: 1));
+                  },
+                  child: StreamBuilder<List<Tontine>>(
+                    stream: FirestoreService().getTontines(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF2E9E6E),
+                          ),
+                        );
+                      }
 
-                    // Erreur
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Erreur : ${snapshot.error}',
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      );
-                    }
+                      if (snapshot.hasError) {
+                        return ErrorState(
+                          message:
+                              'Impossible de charger les tontines.\nVérifiez votre connexion.',
+                          onReessayer: () {},
+                        );
+                      }
 
-                    final tontines = snapshot.data ?? [];
+                      final tontines = snapshot.data ?? [];
 
-                    // Liste vide
-                    if (tontines.isEmpty) {
-                      return const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      if (tontines.isEmpty) {
+                        return ListView(
                           children: [
-                            Icon(
-                              Icons.description_outlined,
-                              size: 70,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              'Aucune tontine pour l\'instant\nAppuyez sur + pour en créer une',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
+                            const SizedBox(height: 80),
+                            EmptyState(
+                              icon: Icons.description_outlined,
+                              titre: 'Aucune tontine',
+                              message:
+                                  'Vous n\'avez pas encore de tontine.\nCréez-en une ou rejoignez-en une !',
+                              boutonTexte: 'Créer une tontine',
+                              onBoutonPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const CreateTontineScreen(),
+                                  ),
+                                );
+                              },
                             ),
                           ],
-                        ),
-                      );
-                    }
-
-                    // ── Liste des tontines ──
-                    return ListView.builder(
-                      itemCount: tontines.length,
-                      itemBuilder: (context, index) {
-                        return TontineCard(
-                          tontine: tontines[index],
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => DetailTontineScreen(
-                                  tontine: tontines[index],
-                                ),
-                              ),
-                            );
-                          },
                         );
-                      },
-                    );
-                  },
+                      }
+
+                      return ListView.builder(
+                        itemCount: tontines.length,
+                        itemBuilder: (context, index) {
+                          return TontineCard(
+                            tontine: tontines[index],
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DetailTontineScreen(
+                                    tontine: tontines[index],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
