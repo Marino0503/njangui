@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/notifications_data.dart';
 import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
 import 'home_screen.dart';
@@ -7,6 +6,7 @@ import 'tontines_screen.dart';
 import 'profil_screen.dart';
 import 'notification_screen.dart';
 import 'statistiques_screen.dart';
+import 'chatbot_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -30,6 +30,23 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_currentIndex],
+
+      // ── Bouton flottant chatbot ──
+      floatingActionButton: _currentIndex != 1
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChatbotScreen(),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF7B2D8B),
+              child: const Icon(Icons.smart_toy, color: Colors.white),
+            )
+          : null,
+
       bottomNavigationBar: StreamBuilder<List<NotificationModel>>(
         stream: FirestoreService().getNotifications(),
         builder: (context, snapshot) {
@@ -55,8 +72,6 @@ class _MainScreenState extends State<MainScreen> {
                 activeIcon: Icon(Icons.description),
                 label: 'Tontines',
               ),
-
-              // ── Notifications avec badge ──
               BottomNavigationBarItem(
                 icon: Badge(
                   isLabelVisible: nonLues > 0,
@@ -70,13 +85,11 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 label: 'Alertes',
               ),
-
               const BottomNavigationBarItem(
                 icon: Icon(Icons.bar_chart_outlined),
                 activeIcon: Icon(Icons.bar_chart),
                 label: 'Stats',
               ),
-
               const BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),
                 activeIcon: Icon(Icons.person),
