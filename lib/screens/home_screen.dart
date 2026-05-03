@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/tontines_data.dart';
+import '../services/firestore_service.dart';
+import '../models/tontine.dart';
 import '../widgets/tontine_card.dart';
 import 'detail_tontine_screen.dart';
 
@@ -8,8 +9,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = TontinesData();
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -53,7 +52,7 @@ class HomeScreen extends StatelessWidget {
               // ── Bonjour utilisateur ──
               const Center(
                 child: Text(
-                  'Bonjour Mégane',
+                  'Bonjour !',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
                 ),
               ),
@@ -85,34 +84,63 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // ── Liste des tontines ──
-              data.tontines.isEmpty
-                  ? const Center(
+              // ── Liste depuis Firestore ──
+              StreamBuilder<List<Tontine>>(
+                stream: FirestoreService().getTontines(),
+                builder: (context, snapshot) {
+                  // Chargement
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF2E9E6E),
+                      ),
+                    );
+                  }
+
+                  // Erreur
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Erreur : ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  final tontines = snapshot.data ?? [];
+
+                  // Liste vide
+                  if (tontines.isEmpty) {
+                    return const Center(
                       child: Text(
                         'Aucune tontine pour l\'instant',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: data.tontines.length,
-                      itemBuilder: (context, index) {
-                        return TontineCard(
-                          tontine: data.tontines[index],
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => DetailTontineScreen(
-                                  tontine: data.tontines[index],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                    );
+                  }
+
+                  // ── Liste des tontines ──
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: tontines.length,
+                    itemBuilder: (context, index) {
+                      return TontineCard(
+                        tontine: tontines[index],
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  DetailTontineScreen(tontine: tontines[index]),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
 
               const SizedBox(height: 20),
             ],

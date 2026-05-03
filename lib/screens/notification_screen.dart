@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/notifications_data.dart';
+import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
 
-class NotificationScreen extends StatefulWidget {
+class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
-
-  @override
-  State<NotificationScreen> createState() => _NotificationScreenState();
-}
-
-class _NotificationScreenState extends State<NotificationScreen> {
-  final NotificationsData _data = NotificationsData();
 
   @override
   Widget build(BuildContext context) {
@@ -32,49 +25,50 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     'Notifications',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  // Bouton tout marquer comme lu
-                  if (_data.nonLues > 0)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _data.marquerToutesCommeLues();
-                        });
-                      },
-                      child: const Text(
-                        'Tout lire',
-                        style: TextStyle(color: Color(0xFF7B2D8B)),
-                      ),
+                  TextButton(
+                    onPressed: () async {
+                      await FirestoreService().marquerToutesCommeLues();
+                    },
+                    child: const Text(
+                      'Tout lire',
+                      style: TextStyle(color: Color(0xFF7B2D8B)),
                     ),
+                  ),
                 ],
               ),
             ),
 
-            // ── Badge nombre non lues ──
-            if (_data.nonLues > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7B2D8B),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_data.nonLues} non lue(s)',
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                ),
-              ),
-
             const SizedBox(height: 16),
 
-            // ── Liste des notifications ──
+            // ── Liste des notifications depuis Firestore ──
             Expanded(
-              child: _data.notifications.isEmpty
-                  ? const Center(
+              child: StreamBuilder<List<NotificationModel>>(
+                stream: FirestoreService().getNotifications(),
+                builder: (context, snapshot) {
+                  // Chargement
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF2E9E6E),
+                      ),
+                    );
+                  }
+
+                  // Erreur
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Erreur : ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  final notifications = snapshot.data ?? [];
+
+                  // Liste vide
+                  if (notifications.isEmpty) {
+                    return const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -90,14 +84,55 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _data.notifications.length,
-                      itemBuilder: (context, index) {
-                        final notif = _data.notifications[index];
-                        return _buildNotificationTile(notif);
-                      },
-                    ),
+                    );
+                  }
+
+                  // ── Nombre non lues ──
+                  final nonLues = notifications.where((n) => !n.lu).length;
+
+                  return Column(
+                    children: [
+                      // Badge non lues
+                      if (nonLues > 0)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7B2D8B),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '$nonLues non lue(s)',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 12),
+
+                      // Liste
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: notifications.length,
+                          itemBuilder: (context, index) {
+                            return _buildNotificationTile(
+                              context,
+                              notifications[index],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -105,15 +140,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildNotificationTile(NotificationModel notif) {
+  Widget _buildNotificationTile(BuildContext context, NotificationModel notif) {
     final couleur = NotificationModel.couleurPourType(notif.type);
     final icone = NotificationModel.iconPourType(notif.type);
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _data.marquerCommeLue(notif.id);
-        });
+      onTap: () async {
+        await FirestoreService().marquerNotifCommeLue(notif.id);
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -148,13 +181,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        notif.titre,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: notif.lu
-                              ? FontWeight.normal
-                              : FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          notif.titre,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: notif.lu
+                                ? FontWeight.normal
+                                : FontWeight.bold,
+                          ),
                         ),
                       ),
                       Text(

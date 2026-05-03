@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
-import '../data/tontines_data.dart';
+import '../services/firestore_service.dart';
+import '../models/tontine.dart';
 import '../widgets/tontine_card.dart';
 import 'create_tontine_screen.dart';
 import 'rejoindre_tontine_screen.dart';
 import 'detail_tontine_screen.dart';
 
-class TontinesScreen extends StatefulWidget {
+class TontinesScreen extends StatelessWidget {
   const TontinesScreen({super.key});
-
-  @override
-  State<TontinesScreen> createState() => _TontinesScreenState();
-}
-
-class _TontinesScreenState extends State<TontinesScreen> {
-  final TontinesData _data = TontinesData();
 
   @override
   Widget build(BuildContext context) {
@@ -35,17 +29,14 @@ class _TontinesScreenState extends State<TontinesScreen> {
                     'Mes Tontines',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-
-                  // ── Bouton rejoindre ──
                   TextButton.icon(
-                    onPressed: () async {
-                      await Navigator.push(
+                    onPressed: () {
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const RejoindreTonitneScreen(),
                         ),
                       );
-                      setState(() {});
                     },
                     icon: const Icon(Icons.group_add, color: Color(0xFF7B2D8B)),
                     label: const Text(
@@ -58,51 +49,93 @@ class _TontinesScreenState extends State<TontinesScreen> {
 
               const SizedBox(height: 20),
 
-              // ── Liste des tontines ──
+              // ── Liste des tontines depuis Firestore ──
               Expanded(
-                child: _data.tontines.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Aucune tontine pour l\'instant\nAppuyez sur + pour en créer une',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                child: StreamBuilder<List<Tontine>>(
+                  stream: FirestoreService().getTontines(),
+                  builder: (context, snapshot) {
+                    // Chargement
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF2E9E6E),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _data.tontines.length,
-                        itemBuilder: (context, index) {
-                          return TontineCard(
-                            tontine: _data.tontines[index],
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DetailTontineScreen(
-                                    tontine: _data.tontines[index],
-                                  ),
+                      );
+                    }
+
+                    // Erreur
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Erreur : ${snapshot.error}',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+
+                    final tontines = snapshot.data ?? [];
+
+                    // Liste vide
+                    if (tontines.isEmpty) {
+                      return const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.description_outlined,
+                              size: 70,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Aucune tontine pour l\'instant\nAppuyez sur + pour en créer une',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // ── Liste des tontines ──
+                    return ListView.builder(
+                      itemCount: tontines.length,
+                      itemBuilder: (context, index) {
+                        return TontineCard(
+                          tontine: tontines[index],
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailTontineScreen(
+                                  tontine: tontines[index],
                                 ),
-                              );
-                              setState(() {});
-                            },
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),
         ),
       ),
 
-      // ── Bouton + créer une tontine ──
+      // ── Bouton + ──
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
+        onPressed: () {
+          Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const CreateTontineScreen(),
             ),
           );
-          setState(() {});
         },
         backgroundColor: Colors.white,
         shape: const CircleBorder(

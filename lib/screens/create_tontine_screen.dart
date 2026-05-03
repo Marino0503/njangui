@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/tontine.dart';
-import '../data/tontines_data.dart';
-import '../data/notifications_data.dart';
+//import '../data/tontines_data.dart';
+//import '../data/notifications_data.dart';
+import '../services/firestore_service.dart';
+import '../models/notification_model.dart';
 
 class CreateTontineScreen extends StatefulWidget {
   const CreateTontineScreen({super.key});
@@ -11,19 +13,25 @@ class CreateTontineScreen extends StatefulWidget {
 }
 
 class _CreateTontineScreenState extends State<CreateTontineScreen> {
+  bool _isLoading = false;
   // ── Contrôleurs ──
+  final TextEditingController _nomController = TextEditingController();
+  final TextEditingController _montantController = TextEditingController();
   final TextEditingController _nombreMembresController =
       TextEditingController();
 
   // ── Valeurs des champs ──
   DateTime _dateDebut = DateTime.now();
-  String _ordreReception = 'aleatoire'; // valeur par défaut
+  String _ordreReception = 'aleatoire';
+  String _frequence = 'mois'; // valeur par défaut
   bool _paiementsEnregistres = true;
   bool _prevuesObligatoires = true;
   bool _membresVoientHistorique = true;
 
   @override
   void dispose() {
+    _nomController.dispose();
+    _montantController.dispose();
     _nombreMembresController.dispose();
     super.dispose();
   }
@@ -69,47 +77,100 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
   }
 
   // ── Crée la tontine ──
-  void _creerTontine() {
-    if (_nombreMembresController.text.isEmpty) {
+  Future<void> _creerTontine() async {
+    // ── Validations ──
+    if (_nomController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer le nombre de membres')),
+        const SnackBar(
+          content: Text('Veuillez entrer le nom de la tontine'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
 
-    // Génère un code unique pour la tontine
-    final code =
-        'TN${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    if (_montantController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez entrer le montant'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-    final nouvelleTontine = Tontine(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      nom: 'Nouvelle tontine',
-      montant: 0,
-      frequence: 'mois',
-      prochaineEcheance: _formaterDate(_dateDebut),
-      enCours: false,
-      dateDebut: _dateDebut,
-      ordreReception: _ordreReception,
-      nombreMembres: int.parse(_nombreMembresController.text),
-      paiementsEnregistres: _paiementsEnregistres,
-      prevuesObligatoires: _prevuesObligatoires,
-      membresVoientHistorique: _membresVoientHistorique,
-      gestionnaire: 'Moi',
-      membres: [],
-      codeInvitation: code, // ← code généré automatiquement
-    );
+    if (_nombreMembresController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez entrer le nombre de membres'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-    TontinesData().ajouterTontine(nouvelleTontine);
-    NotificationsData().notifierNouvelleTontine(nouvelleTontine.nom);
+    setState(() => _isLoading = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Tontine créée ! Code : $code'),
-        backgroundColor: const Color(0xFF2E9E6E),
-      ),
-    );
+    try {
+      // ── Génère un code unique ──
+      final code =
+          'TN${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
-    Navigator.pop(context);
+      // ── Crée la tontine ──
+      final nouvelleTontine = Tontine(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        nom: _nomController.text.trim(),
+        montant: double.parse(_montantController.text.trim()),
+        frequence: _frequence,
+        prochaineEcheance: _formaterDate(_dateDebut),
+        enCours: false,
+        dateDebut: _dateDebut,
+        ordreReception: _ordreReception,
+        nombreMembres: int.parse(_nombreMembresController.text.trim()),
+        paiementsEnregistres: _paiementsEnregistres,
+        prevuesObligatoires: _prevuesObligatoires,
+        membresVoientHistorique: _membresVoientHistorique,
+        gestionnaire: 'Moi',
+        membres: [],
+        codeInvitation: code,
+      );
+
+      // ── Sauvegarde dans Firestore ──
+      await FirestoreService().creerTontine(nouvelleTontine);
+
+      // ── Sauvegarde la notification dans Firestore ──
+      await FirestoreService().creerNotification(
+        NotificationModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          titre: 'Nouvelle tontine créée',
+          message: 'Vous avez créé la tontine "${nouvelleTontine.nom}"',
+          date: DateTime.now(),
+          type: TypeNotification.nouvelleTontine,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tontine "${nouvelleTontine.nom}" créée ! Code : $code',
+          ),
+          backgroundColor: const Color(0xFF2E9E6E),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -151,6 +212,89 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                     ),
 
                     const SizedBox(height: 30),
+
+                    // ── Nom de la tontine ──
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: _nomController,
+                        style: const TextStyle(fontSize: 18),
+                        decoration: const InputDecoration(
+                          labelText: 'Nom de la tontine',
+                          hintText: 'Ex: Famille cité verte',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.all(16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ── Montant ──
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: _montantController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 18),
+                        decoration: const InputDecoration(
+                          labelText: 'Montant',
+                          hintText: 'Ex: 10000',
+                          suffixText: 'FCFA',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.all(16),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ── Fréquence ──
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _frequence,
+                          isExpanded: true,
+                          hint: const Text('Fréquence de cotisation'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'semaine',
+                              child: Text('Chaque semaine'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'mois',
+                              child: Text('Chaque mois'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'trimestre',
+                              child: Text('Chaque trimestre'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() => _frequence = value!);
+                          },
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
 
                     // ── Date de début ──
                     GestureDetector(
@@ -203,8 +347,6 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                             style: TextStyle(fontSize: 14, color: Colors.grey),
                           ),
                           const SizedBox(height: 8),
-
-                          // Tirage aléatoire
                           Row(
                             children: [
                               Radio<String>(
@@ -221,8 +363,6 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                               ),
                             ],
                           ),
-
-                          // Ordre défini
                           Row(
                             children: [
                               Radio<String>(
@@ -303,7 +443,7 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                 width: double.infinity,
                 height: 60,
                 child: ElevatedButton(
-                  onPressed: _creerTontine,
+                  onPressed: _isLoading ? null : _creerTontine,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E9E6E),
                     foregroundColor: Colors.white,
@@ -312,20 +452,22 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'Créer la tontine',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              'Créer la tontine',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Icon(Icons.arrow_forward_ios, size: 18),
+                          ],
                         ),
-                      ),
-                      SizedBox(width: 10),
-                      Icon(Icons.arrow_forward_ios, size: 18),
-                    ],
-                  ),
                 ),
               ),
             ),

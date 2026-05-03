@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../data/tontines_data.dart';
-import '../data/notifications_data.dart';
+import '../services/firestore_service.dart';
 import '../models/tontine.dart';
+import '../models/notification_model.dart';
 
 class RejoindreTonitneScreen extends StatefulWidget {
   const RejoindreTonitneScreen({super.key});
@@ -13,7 +13,8 @@ class RejoindreTonitneScreen extends StatefulWidget {
 class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
   final TextEditingController _codeController = TextEditingController();
   Tontine? _tontineTrouvee;
-  bool _recherche = false;
+  bool _isLoading = false;
+  bool _isJoining = false;
 
   @override
   void dispose() {
@@ -21,8 +22,8 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
     super.dispose();
   }
 
-  // Recherche la tontine par code
-  void _rechercherTontine() {
+  // Recherche la tontine par code dans Firestore
+  Future<void> _rechercherTontine() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -31,13 +32,15 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
       return;
     }
 
-    setState(() => _recherche = true);
+    setState(() => _isLoading = true);
 
-    final tontine = TontinesData().trouverParCode(code);
+    final tontine = await FirestoreService().trouverParCode(code);
+
+    if (!mounted) return;
 
     setState(() {
       _tontineTrouvee = tontine;
-      _recherche = false;
+      _isLoading = false;
     });
 
     if (tontine == null) {
@@ -51,31 +54,57 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
   }
 
   // Rejoindre la tontine
-  void _rejoindre() {
+  Future<void> _rejoindre() async {
     if (_tontineTrouvee == null) return;
 
-    // Ajoute le nouveau membre
-    final nouveauMembre = Membre(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      nom: 'Moi',
-      aPaye: false,
-    );
+    setState(() => _isJoining = true);
 
-    _tontineTrouvee!.membres.add(nouveauMembre);
+    try {
+      // Ajoute le nouveau membre
+      final nouveauMembre = Membre(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        nom: 'Moi',
+        aPaye: false,
+      );
 
-    // Crée une notification
-    NotificationsData().notifierNouveauMembre('Vous', _tontineTrouvee!.nom);
+      final membresMAJ = [..._tontineTrouvee!.membres, nouveauMembre];
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Vous avez rejoint "${_tontineTrouvee!.nom}" avec succès !',
+      // Met à jour les membres dans Firestore
+      await FirestoreService().mettreAJourMembres(
+        _tontineTrouvee!.id,
+        membresMAJ,
+      );
+
+      // Crée une notification dans Firestore
+      await FirestoreService().creerNotification(
+        NotificationModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          titre: 'Nouveau membre',
+          message: 'Vous avez rejoint "${_tontineTrouvee!.nom}"',
+          date: DateTime.now(),
+          type: TypeNotification.nouveauMembre,
         ),
-        backgroundColor: const Color(0xFF2E9E6E),
-      ),
-    );
+      );
 
-    Navigator.pop(context);
+      if (!mounted) return;
+
+      setState(() => _isJoining = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Vous avez rejoint "${_tontineTrouvee!.nom}" !'),
+          backgroundColor: const Color(0xFF2E9E6E),
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isJoining = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -182,7 +211,7 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: _recherche ? null : _rechercherTontine,
+                  onPressed: _isLoading ? null : _rechercherTontine,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF7B2D8B),
                     foregroundColor: Colors.white,
@@ -191,7 +220,7 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: _recherche
+                  child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
                           'Rechercher',
@@ -202,7 +231,7 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
 
               const SizedBox(height: 24),
 
-              // ── Résultat de la recherche ──
+              // ── Résultat ──
               if (_tontineTrouvee != null)
                 Container(
                   width: double.infinity,
@@ -245,7 +274,7 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _rejoindre,
+                          onPressed: _isJoining ? null : _rejoindre,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2E9E6E),
                             foregroundColor: Colors.white,
@@ -254,10 +283,14 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
-                            'Rejoindre cette tontine',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                          child: _isJoining
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                              : const Text(
+                                  'Rejoindre cette tontine',
+                                  style: TextStyle(fontSize: 16),
+                                ),
                         ),
                       ),
                     ],
@@ -270,7 +303,6 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
     );
   }
 
-  // ── Widget pour chaque ligne d'info ──
   Widget _buildInfoRow(String label, String valeur) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
