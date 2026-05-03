@@ -10,6 +10,7 @@ import '../utils/formatage.dart';
 import '../models/notification_model.dart';
 import 'historique_paiements_screen.dart';
 import 'ajouter_membre_screen.dart';
+import 'paiement_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -531,6 +532,7 @@ class DetailTontineScreen extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // ── Icône + Nom ──
             Row(
               children: [
                 Container(
@@ -553,7 +555,7 @@ class DetailTontineScreen extends StatelessWidget {
                     Text(
                       membre.nom,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -566,35 +568,58 @@ class DetailTontineScreen extends StatelessWidget {
               ],
             ),
 
-            // ── Badge statut ──
+            // ── Bouton payer ou badge payé ──
             membre.aPaye
                 ? Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2E9E6E),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  )
-                : Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade100,
+                      color: const Color(0xFF2E9E6E),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
-                      'En retard',
+                      'Payé ✅',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              PaiementScreen(tontine: tontine, membre: membre),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7B2D8B),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.payment, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'Payer',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
