@@ -5,6 +5,10 @@ import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
 import '../utils/formatage.dart';
 import 'modifier_tontine_screen.dart';
+import '../models/paiement.dart';
+import '../utils/formatage.dart';
+import '../models/notification_model.dart';
+import 'historique_paiements_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -30,40 +34,69 @@ class DetailTontineScreen extends StatelessWidget {
   }
 
   void _changerStatutMembre(BuildContext context, Membre membre) async {
-    if (membre.aPaye) {
+    try {
+      // Met à jour le statut du membre
+      final membresMAJ = tontine.membres.map((m) {
+        if (m.id == membre.id) {
+          return Membre(
+            id: m.id,
+            nom: m.nom,
+            aPaye: !m.aPaye, // inverse le statut
+          );
+        }
+        return m;
+      }).toList();
+
+      // Met à jour dans Firestore
+      await FirestoreService().mettreAJourMembres(tontine.id, membresMAJ);
+
+      // ✅ Enregistre le paiement
+      final paiement = Paiement(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        membreId: membre.id,
+        membreNom: membre.nom,
+        montant: tontine.montant,
+        date: DateTime.now(),
+        tontineId: tontine.id,
+        tontineNom: tontine.nom,
+        statut: !membre.aPaye ? 'paye' : 'en_retard',
+      );
+
+      await FirestoreService().enregistrerPaiement(paiement);
+
+      // ✅ Crée une notification
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          titre: 'Nouveau dépôt',
-          message:
-              '${membre.nom} a payé ${Formatage.montant(tontine.montant)} dans "${tontine.nom}"',
+          titre: !membre.aPaye ? 'Nouveau dépôt' : 'Retard de contribution',
+          message: !membre.aPaye
+              ? '${membre.nom} a payé ${Formatage.montant(tontine.montant)} dans "${tontine.nom}"'
+              : '${membre.nom} est en retard dans "${tontine.nom}"',
           date: DateTime.now(),
-          type: TypeNotification.nouveauDepot,
+          type: !membre.aPaye
+              ? TypeNotification.nouveauDepot
+              : TypeNotification.retardContribution,
         ),
       );
-    } else {
-      await FirestoreService().creerNotification(
-        NotificationModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          titre: 'Retard de contribution',
-          message: '${membre.nom} est en retard dans "${tontine.nom}"',
-          date: DateTime.now(),
-          type: TypeNotification.retardContribution,
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            !membre.aPaye
+                ? '${membre.nom} marqué comme payé ✅'
+                : '${membre.nom} marqué en retard ❌',
+          ),
+          backgroundColor: !membre.aPaye ? const Color(0xFF2E9E6E) : Colors.red,
         ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
       );
     }
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          membre.aPaye
-              ? '${membre.nom} marqué comme payé'
-              : '${membre.nom} marqué en retard',
-        ),
-        backgroundColor: membre.aPaye ? const Color(0xFF2E9E6E) : Colors.red,
-      ),
-    );
   }
 
   @override
@@ -336,54 +369,104 @@ class DetailTontineScreen extends StatelessWidget {
               ),
             ),
 
-            // ── Prochaine échéance ──
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 24,
-                  horizontal: 20,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.grey,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Prochaine échéance',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+            // ── Prochaine échéance + Historique ──
+            Column(
+              children: [
+                // ── Bouton Historique ──
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            HistoriquePaiementsScreen(tontine: tontine),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 20,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF7B2D8B),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [
+                        Row(
+                          children: [
+                            Icon(Icons.history, color: Colors.white, size: 22),
+                            SizedBox(width: 10),
+                            Text(
+                              'Historique des paiements',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'le ${_formaterDate(tontine.dateDebut)}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ],
                     ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+
+                // ── Prochaine échéance ──
+                GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 24,
+                      horizontal: 20,
+                    ),
+                    decoration: const BoxDecoration(color: Colors.grey),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Prochaine échéance',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'le ${_formaterDate(tontine.dateDebut)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

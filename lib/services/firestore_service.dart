@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/tontine.dart';
 import '../models/notification_model.dart';
+import '../models/paiement.dart';
 
 class FirestoreService {
   // Singleton
@@ -179,6 +180,37 @@ class FirestoreService {
       'paiementsEnregistres': tontine.paiementsEnregistres,
       'prevuesObligatoires': tontine.prevuesObligatoires,
       'membresVoientHistorique': tontine.membresVoientHistorique,
+    });
+  }
+
+  // ════════════════════════════════════════
+  //           PAIEMENTS
+  // ════════════════════════════════════════
+
+  CollectionReference get _paiements => _db.collection('paiements');
+
+  // Enregistrer un paiement
+  Future<void> enregistrerPaiement(Paiement paiement) async {
+    await _paiements.doc(paiement.id).set(paiement.toMap());
+  }
+
+  // Récupérer les paiements d'une tontine en temps réel
+  Stream<List<Paiement>> getPaiements(String tontineId) {
+    return _paiements.where('tontineId', isEqualTo: tontineId).snapshots().map((
+      snapshot,
+    ) {
+      return snapshot.docs.map((doc) {
+        return Paiement.fromMap(doc.data() as Map<String, dynamic>);
+      }).toList()..sort((a, b) => b.date.compareTo(a.date));
+    });
+  }
+
+  // Récupérer tous les paiements de l'utilisateur
+  Stream<List<Paiement>> getTousPaiements() {
+    return _paiements.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Paiement.fromMap(doc.data() as Map<String, dynamic>);
+      }).toList()..sort((a, b) => b.date.compareTo(a.date));
     });
   }
 }
