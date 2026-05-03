@@ -261,4 +261,15 @@ class FirestoreService {
       };
     });
   }
+
+  // Supprimer un membre d'une tontine
+  Future<void> supprimerMembre(String tontineId, String membreId) async {
+    final doc = await _tontines.doc(tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+    final membres = (data['membres'] as List<dynamic>)
+        .where((m) => m['id'] != membreId)
+        .toList();
+
+    await _tontines.doc(tontineId).update({'membres': membres});
+  }
 }

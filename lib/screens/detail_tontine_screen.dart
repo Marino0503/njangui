@@ -520,6 +520,7 @@ class DetailTontineScreen extends StatelessWidget {
   Widget _buildMembreTile(Membre membre, BuildContext context) {
     return GestureDetector(
       onTap: () => _changerStatutMembre(context, membre),
+      onLongPress: () => _confirmerSuppressionMembre(context, membre),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -546,15 +547,26 @@ class DetailTontineScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-                Text(
-                  membre.nom,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      membre.nom,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Text(
+                      'Appui long pour supprimer',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
                 ),
               ],
             ),
+
+            // ── Badge statut ──
             membre.aPaye
                 ? Container(
                     padding: const EdgeInsets.all(6),
@@ -588,6 +600,61 @@ class DetailTontineScreen extends StatelessWidget {
                   ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmerSuppressionMembre(BuildContext context, Membre membre) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer le membre'),
+        content: Text(
+          'Voulez-vous vraiment supprimer "${membre.nom}" de cette tontine ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await FirestoreService().supprimerMembre(tontine.id, membre.id);
+
+                // Crée une notification
+                await FirestoreService().creerNotification(
+                  NotificationModel(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    titre: 'Membre supprimé',
+                    message: '${membre.nom} a été retiré de "${tontine.nom}"',
+                    date: DateTime.now(),
+                    type: TypeNotification.nouveauMembre,
+                  ),
+                );
+
+                if (!context.mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${membre.nom} supprimé avec succès !'),
+                    backgroundColor: const Color(0xFF2E9E6E),
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur : $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }
