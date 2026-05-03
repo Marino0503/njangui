@@ -213,4 +213,52 @@ class FirestoreService {
       }).toList()..sort((a, b) => b.date.compareTo(a.date));
     });
   }
+  // ════════════════════════════════════════
+  //           STATISTIQUES
+  // ════════════════════════════════════════
+
+  // Récupère les stats globales
+  Stream<Map<String, dynamic>> getStats() {
+    return _tontines.snapshots().asyncMap((tontinesSnapshot) async {
+      final tontines = tontinesSnapshot.docs;
+
+      // Nombre total de tontines
+      final nombreTontines = tontines.length;
+
+      // Nombre total de membres
+      int nombreMembres = 0;
+      for (var doc in tontines) {
+        final data = doc.data() as Map<String, dynamic>;
+        final membres = data['membres'] as List<dynamic>? ?? [];
+        nombreMembres += membres.length;
+      }
+
+      // Paiements
+      final paiementsSnapshot = await _paiements.get();
+      final paiements = paiementsSnapshot.docs;
+
+      // Total payé
+      double totalPaye = 0;
+      int nombrePaies = 0;
+      int nombreRetards = 0;
+
+      for (var doc in paiements) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data['statut'] == 'paye') {
+          totalPaye += (data['montant'] as num).toDouble();
+          nombrePaies++;
+        } else {
+          nombreRetards++;
+        }
+      }
+
+      return {
+        'nombreTontines': nombreTontines,
+        'nombreMembres': nombreMembres,
+        'totalPaye': totalPaye,
+        'nombrePaies': nombrePaies,
+        'nombreRetards': nombreRetards,
+      };
+    });
+  }
 }
