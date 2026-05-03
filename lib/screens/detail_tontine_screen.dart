@@ -11,6 +11,7 @@ import '../models/notification_model.dart';
 import 'historique_paiements_screen.dart';
 import 'ajouter_membre_screen.dart';
 import 'paiement_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -300,22 +301,47 @@ class DetailTontineScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          IconButton(
-                            onPressed: () {
-                              Clipboard.setData(
-                                ClipboardData(text: tontine.codeInvitation),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Code copié !'),
-                                  backgroundColor: Color(0xFF2E9E6E),
+                          // ── Boutons copier et partager ──
+                          Row(
+                            children: [
+                              // ── Bouton copier ──
+                              IconButton(
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: tontine.codeInvitation),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Code copié !'),
+                                      backgroundColor: Color(0xFF2E9E6E),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.copy,
+                                  color: Color(0xFF7B2D8B),
                                 ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.copy,
-                              color: Color(0xFF7B2D8B),
-                            ),
+                              ),
+
+                              // ── Bouton partager ──
+                              IconButton(
+                                onPressed: () {
+                                  Share.share(
+                                    '🎉 Rejoins ma tontine "${tontine.nom}" sur Njangi !\n\n'
+                                    '📱 Code d\'invitation : ${tontine.codeInvitation}\n\n'
+                                    '💰 Cotisation : ${Formatage.montant(tontine.montant)}/${tontine.frequence}\n\n'
+                                    '👥 Places disponibles : ${tontine.nombreMembres - tontine.membres.length}/${tontine.nombreMembres}\n\n'
+                                    'Télécharge l\'app Njangi et entre le code pour nous rejoindre ! 🚀',
+                                    subject:
+                                        'Invitation tontine ${tontine.nom}',
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.share,
+                                  color: Color(0xFF7B2D8B),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
