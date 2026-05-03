@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/tontine.dart';
-import '../data/notifications_data.dart';
 import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
 import '../utils/formatage.dart';
+import 'modifier_tontine_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -81,27 +81,78 @@ class DetailTontineScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 20),
 
-                    // ── Bouton retour + Nom tontine ──
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.arrow_back_ios,
+                    // ── Bouton retour + Nom tontine + Actions ──
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.arrow_back_ios,
+                                color: Color(0xFF7B2D8B),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                tontine.nom,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF7B2D8B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // ── Menu actions ──
+                        PopupMenuButton<String>(
+                          icon: const Icon(
+                            Icons.more_vert,
                             color: Color(0xFF7B2D8B),
-                            size: 18,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            tontine.nom,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF7B2D8B),
+                          onSelected: (value) async {
+                            if (value == 'modifier') {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ModifierTontineScreen(tontine: tontine),
+                                ),
+                              );
+                            } else if (value == 'supprimer') {
+                              _confirmerSuppression(context);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'modifier',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, color: Color(0xFF7B2D8B)),
+                                  SizedBox(width: 8),
+                                  Text('Modifier'),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            const PopupMenuItem(
+                              value: 'supprimer',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Supprimer',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 24),
@@ -411,6 +462,53 @@ class DetailTontineScreen extends StatelessWidget {
                   ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmerSuppression(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer la tontine'),
+        content: Text(
+          'Voulez-vous vraiment supprimer "${tontine.nom}" ?\nCette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await FirestoreService().supprimerTontine(tontine.id);
+
+                if (!context.mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Tontine supprimée avec succès !'),
+                    backgroundColor: Color(0xFF2E9E6E),
+                  ),
+                );
+
+                // Retour à la page précédente
+                Navigator.pop(context);
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur : $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

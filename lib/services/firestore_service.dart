@@ -162,4 +162,23 @@ class FirestoreService {
       membres: membres,
     );
   }
+
+  // Supprimer une tontine
+  Future<void> supprimerTontine(String id) async {
+    await _tontines.doc(id).delete();
+  }
+
+  // Mettre à jour une tontine
+  Future<void> mettreAJourTontine(Tontine tontine) async {
+    await _tontines.doc(tontine.id).update({
+      'nom': tontine.nom,
+      'montant': tontine.montant,
+      'frequence': tontine.frequence,
+      'nombreMembres': tontine.nombreMembres,
+      'ordreReception': tontine.ordreReception,
+      'paiementsEnregistres': tontine.paiementsEnregistres,
+      'prevuesObligatoires': tontine.prevuesObligatoires,
+      'membresVoientHistorique': tontine.membresVoientHistorique,
+    });
+  }
 }
