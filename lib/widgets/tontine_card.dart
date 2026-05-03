@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/tontine.dart';
+import '../utils/formatage.dart';
 
 class TontineCard extends StatelessWidget {
   final Tontine tontine;
@@ -48,7 +49,7 @@ class TontineCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${tontine.montant.toStringAsFixed(0)} FCFA/${tontine.frequence}',
+                        '${Formatage.montant(tontine.montant)}/${tontine.frequence}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.white70,

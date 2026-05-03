@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../screens/login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart';
+import '../services/firestore_service.dart';
+import '../models/tontine.dart';
+import 'login_screen.dart';
+import '../utils/formatage.dart';
 
 class ProfilScreen extends StatelessWidget {
   const ProfilScreen({super.key});
@@ -10,165 +14,191 @@ class ProfilScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              const SizedBox(height: 30),
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: UserService().getProfilStream(),
+          builder: (context, profilSnapshot) {
+            if (profilSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF2E9E6E)),
+              );
+            }
 
-              // ── Titre ──
-              const Text(
-                'Mon Profil',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
+            final profil = profilSnapshot.data;
+            final nom = profil?['nom'] ?? 'Utilisateur';
+            final telephone = profil?['telephone'] ?? '';
 
-              const SizedBox(height: 30),
+            return StreamBuilder<List<Tontine>>(
+              stream: FirestoreService().getTontines(),
+              builder: (context, tontinesSnapshot) {
+                // Compte les tontines actives
+                final tontines = tontinesSnapshot.data ?? [];
+                final nombreTontines = tontines.length;
 
-              // ── Photo de profil ──
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: const Color(0xFF90EED4),
-                    child: const Icon(
-                      Icons.person,
-                      size: 70,
-                      color: Colors.white,
-                    ),
-                  ),
-                  // Bouton modifier photo
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF7B2D8B),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 30),
 
-              const SizedBox(height: 16),
-
-              // ── Nom ──
-              const Text(
-                'Mégane',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 6),
-
-              // ── Numéro ──
-              const Text(
-                '+237 658 834 387',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-
-              const SizedBox(height: 40),
-
-              // ── Informations ──
-              _buildInfoTile(
-                icon: Icons.person_outline,
-                titre: 'Nom complet',
-                valeur: 'Mégane Dupont',
-              ),
-              _buildInfoTile(
-                icon: Icons.phone_outlined,
-                titre: 'Téléphone',
-                valeur: '+237 658 834 387',
-              ),
-              _buildInfoTile(
-                icon: Icons.calendar_today_outlined,
-                titre: 'Membre depuis',
-                valeur: 'Janvier 2024',
-              ),
-              _buildInfoTile(
-                icon: Icons.groups_outlined,
-                titre: 'Tontines actives',
-                valeur: '2',
-              ),
-
-              const SizedBox(height: 40),
-
-              // ── Bouton déconnexion ──
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    // Dialogue de confirmation
-                    final confirmer = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Déconnexion'),
-                        content: const Text(
-                          'Voulez-vous vraiment vous déconnecter ?',
+                      // ── Titre ──
+                      const Text(
+                        'Mon Profil',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Annuler'),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // ── Photo de profil ──
+                      Stack(
+                        children: [
+                          const CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Color(0xFF90EED4),
+                            child: Icon(
+                              Icons.person,
+                              size: 70,
+                              color: Colors.white,
+                            ),
                           ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text(
-                              'Déconnecter',
-                              style: TextStyle(color: Colors.red),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF7B2D8B),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    );
 
-                    if (confirmer == true) {
-                      // Déconnexion Firebase
-                      await FirebaseAuth.instance.signOut();
+                      const SizedBox(height: 16),
 
-                      if (!context.mounted) return;
-
-                      // Retour à la page de login
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
+                      // ── Nom ──
+                      Text(
+                        nom,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
-                        (route) => false,
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text(
-                    'Se déconnecter',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade400,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
+                      ),
 
-              const SizedBox(height: 30),
-            ],
-          ),
+                      const SizedBox(height: 6),
+
+                      // ── Numéro ──
+                      Text(
+                        telephone,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      // ── Informations ──
+                      _buildInfoTile(
+                        icon: Icons.person_outline,
+                        titre: 'Nom complet',
+                        valeur: nom,
+                      ),
+                      _buildInfoTile(
+                        icon: Icons.phone_outlined,
+                        titre: 'Téléphone',
+                        valeur: Formatage.telephone(telephone),
+                      ),
+                      // ── Tontines actives depuis Firestore ──
+                      _buildInfoTile(
+                        icon: Icons.groups_outlined,
+                        titre: 'Tontines actives',
+                        valeur: nombreTontines.toString(),
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      // ── Bouton déconnexion ──
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final confirmer = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Déconnexion'),
+                                content: const Text(
+                                  'Voulez-vous vraiment vous déconnecter ?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Annuler'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text(
+                                      'Déconnecter',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirmer == true) {
+                              await UserService().deconnecter();
+
+                              if (!context.mounted) return;
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.logout),
+                          label: const Text(
+                            'Se déconnecter',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade400,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
     );
   }
 
-  // ── Widget réutilisable pour chaque ligne d'info ──
   Widget _buildInfoTile({
     required IconData icon,
     required String titre,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_screen.dart';
+import '../services/user_service.dart';
+import 'complete_profil_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String verificationId;
@@ -61,31 +63,42 @@ class _OtpScreenState extends State<OtpScreen> {
 
       await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // Vérifie que le widget est encore actif après le await
+      if (!mounted) return;
+
+      // Vérifie si le profil est complet
+      final profilComplet = await UserService().profilEstComplet();
+
       if (!mounted) return;
 
       setState(() => _isLoading = false);
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Connexion réussie !')));
-
-      // ✅ Connexion réussie → aller vers MainScreen
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-        (route) => false,
-      );
+      if (profilComplet) {
+        // Profil déjà complet → MainScreen
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+          (route) => false,
+        );
+      } else {
+        // Profil incomplet → Compléter le profil
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                CompleteProfilScreen(phoneNumber: widget.phoneNumber),
+          ),
+          (route) => false,
+        );
+      }
     } on FirebaseAuthException catch (e) {
-      // Vérifie que le widget est encore actif après le await
       if (!mounted) return;
-
       setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Code incorrect : ${e.message}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Code incorrect : ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

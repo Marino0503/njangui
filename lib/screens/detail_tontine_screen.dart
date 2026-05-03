@@ -4,6 +4,7 @@ import '../models/tontine.dart';
 import '../data/notifications_data.dart';
 import '../services/firestore_service.dart';
 import '../models/notification_model.dart';
+import '../utils/formatage.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -35,7 +36,7 @@ class DetailTontineScreen extends StatelessWidget {
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           titre: 'Nouveau dépôt',
           message:
-              '${membre.nom} a payé ${tontine.montant.toStringAsFixed(0)} FCFA dans "${tontine.nom}"',
+              '${membre.nom} a payé ${Formatage.montant(tontine.montant)} dans "${tontine.nom}"',
           date: DateTime.now(),
           type: TypeNotification.nouveauDepot,
         ),
@@ -122,7 +123,7 @@ class DetailTontineScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${tontine.montant.toStringAsFixed(0)} FCFA',
+                            Formatage.montant(tontine.montant),
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w500,

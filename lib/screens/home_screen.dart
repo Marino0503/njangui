@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../models/tontine.dart';
 import '../widgets/tontine_card.dart';
 import 'detail_tontine_screen.dart';
@@ -49,12 +50,21 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // ── Bonjour utilisateur ──
-              const Center(
-                child: Text(
-                  'Bonjour !',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
-                ),
+              // ── Bonjour + vrai nom ──
+              StreamBuilder<Map<String, dynamic>?>(
+                stream: UserService().getProfilStream(),
+                builder: (context, snapshot) {
+                  final nom = snapshot.data?['nom'] ?? '';
+                  return Center(
+                    child: Text(
+                      nom.isEmpty ? 'Bonjour !' : 'Bonjour $nom !',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
               ),
 
               const SizedBox(height: 16),
@@ -88,7 +98,6 @@ class HomeScreen extends StatelessWidget {
               StreamBuilder<List<Tontine>>(
                 stream: FirestoreService().getTontines(),
                 builder: (context, snapshot) {
-                  // Chargement
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
@@ -97,7 +106,6 @@ class HomeScreen extends StatelessWidget {
                     );
                   }
 
-                  // Erreur
                   if (snapshot.hasError) {
                     return Center(
                       child: Text(
@@ -109,7 +117,6 @@ class HomeScreen extends StatelessWidget {
 
                   final tontines = snapshot.data ?? [];
 
-                  // Liste vide
                   if (tontines.isEmpty) {
                     return const Center(
                       child: Text(
@@ -119,7 +126,6 @@ class HomeScreen extends StatelessWidget {
                     );
                   }
 
-                  // ── Liste des tontines ──
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
