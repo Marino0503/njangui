@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
 import '../services/user_service.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
 import 'complete_profil_screen.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -26,6 +28,22 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
+    // ✅ Vérifie si l'onboarding a déjà été vu
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+
+    if (!mounted) return;
+
+    // Première ouverture → Onboarding
+    if (!onboardingComplete) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
+      return;
+    }
+
+    // Onboarding déjà vu → vérifie la connexion
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -82,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
                 const SizedBox(height: 8),
 
-                // ── Tagline selon langue ──
+                // ── Tagline ──
                 Text(
                   provider.langue == 'fr'
                       ? 'la tontine, sans conflit'
