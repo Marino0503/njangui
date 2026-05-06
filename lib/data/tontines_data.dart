@@ -26,6 +26,7 @@ class TontinesData {
         Membre(id: '2', nom: 'Jean-Paul', aPaye: false),
         Membre(id: '3', nom: 'Josiane', aPaye: true),
       ],
+      tours: [],
     ),
     Tontine(
       id: '2',
@@ -46,6 +47,7 @@ class TontinesData {
         Membre(id: '1', nom: 'Paul', aPaye: true),
         Membre(id: '2', nom: 'Sophie', aPaye: false),
       ],
+      tours: [],
     ),
   ];
 

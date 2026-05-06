@@ -40,6 +40,7 @@ class FirestoreService {
       'membres': tontine.membres
           .map((m) => {'id': m.id, 'nom': m.nom, 'aPaye': m.aPaye})
           .toList(),
+      'tours': tontine.tours.map((t) => t.toMap()).toList(),
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -145,6 +146,12 @@ class FirestoreService {
       return Membre(id: m['id'], nom: m['nom'], aPaye: m['aPaye']);
     }).toList();
 
+    // ── Nouveaux tours ──
+    final toursData = data['tours'] as List<dynamic>? ?? [];
+    final tours = toursData.map((t) {
+      return Tour.fromMap(t as Map<String, dynamic>);
+    }).toList();
+
     return Tontine(
       id: data['id'],
       nom: data['nom'],
@@ -161,6 +168,7 @@ class FirestoreService {
       gestionnaire: data['gestionnaire'],
       codeInvitation: data['codeInvitation'],
       membres: membres,
+      tours: tours,
     );
   }
 
@@ -271,5 +279,64 @@ class FirestoreService {
         .toList();
 
     await _tontines.doc(tontineId).update({'membres': membres});
+  }
+
+  // ════════════════════════════════════════
+  //           TOURS
+  // ════════════════════════════════════════
+
+  // Générer les tours automatiquement
+  Future<void> genererTours(Tontine tontine) async {
+    final membres = tontine.membres;
+    if (membres.isEmpty) return;
+
+    List<Membre> membresOrdonnes = List.from(membres);
+
+    // Si tirage aléatoire, mélange les membres
+    if (tontine.ordreReception == 'aleatoire') {
+      membresOrdonnes.shuffle();
+    }
+
+    // Calcule le montant total par tour
+    final montantTotal = tontine.montant * membres.length;
+
+    // Génère les tours
+    final tours = List.generate(membres.length, (index) {
+      final membre = membresOrdonnes[index];
+      final date = DateTime(
+        tontine.dateDebut.year,
+        tontine.dateDebut.month + index,
+        tontine.dateDebut.day,
+      );
+
+      return Tour(
+        numero: index + 1,
+        membreId: membre.id,
+        membreNom: membre.nom,
+        date: date,
+        estComplete: false,
+        montantTotal: montantTotal,
+      );
+    });
+
+    // Sauvegarde dans Firestore
+    await _tontines.doc(tontine.id).update({
+      'tours': tours.map((t) => t.toMap()).toList(),
+    });
+  }
+
+  // Marquer un tour comme complété
+  Future<void> completerTour(String tontineId, int numeroTour) async {
+    final doc = await _tontines.doc(tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+    final tours = (data['tours'] as List<dynamic>).map((t) {
+      final tour = t as Map<String, dynamic>;
+      if (tour['numero'] == numeroTour) {
+        return {...tour, 'estComplete': true};
+      }
+      return tour;
+    }).toList();
+
+    await _tontines.doc(tontineId).update({'tours': tours});
   }
 }

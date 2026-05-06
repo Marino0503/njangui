@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../services/chatbot_service.dart';
 
 class MessageChat {
@@ -29,12 +31,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialise le chatbot
     ChatbotService().initialiser();
-    // Message de bienvenue
+    final provider = Provider.of<AppProvider>(context, listen: false);
     _ajouterMessageBot(
-      '👋 Bonjour ! Je suis l\'assistant Njangi.\n\nComment puis-je vous aider aujourd\'hui ?\n\n'
-      'Hello! I\'m the Njangi assistant.\n\nHow can I help you today?',
+      provider.langue == 'fr'
+          ? '👋 Bonjour ! Je suis l\'assistant Njangi.\n\nComment puis-je vous aider aujourd\'hui ?'
+          : '👋 Hello! I\'m the Njangi assistant.\n\nHow can I help you today?',
     );
   }
 
@@ -45,7 +47,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     super.dispose();
   }
 
-  // Ajoute un message du bot
   void _ajouterMessageBot(String texte) {
     setState(() {
       _messages.add(
@@ -55,7 +56,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollerEnBas();
   }
 
-  // Scrolle vers le bas
   void _scrollerEnBas() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -68,12 +68,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
   }
 
-  // Envoie un message
   Future<void> _envoyerMessage() async {
     final texte = _messageController.text.trim();
     if (texte.isEmpty) return;
 
-    // Ajoute le message de l'utilisateur
     setState(() {
       _messages.add(
         MessageChat(texte: texte, estUtilisateur: true, date: DateTime.now()),
@@ -84,7 +82,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _messageController.clear();
     _scrollerEnBas();
 
-    // Envoie au chatbot
     final reponse = await ChatbotService().envoyerMessage(texte);
 
     if (!mounted) return;
@@ -105,216 +102,239 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
+    return Consumer<AppProvider>(
+      builder: (context, provider, child) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
 
-            // ── Header ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.arrow_back_ios,
-                      color: Color(0xFF7B2D8B),
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // ── Avatar bot ──
-                  Container(
-                    width: 45,
-                    height: 45,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF7B2D8B),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.smart_toy,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // ── Header ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
                     children: [
-                      const Text(
-                        'Assistant Njangi',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(
+                          Icons.arrow_back_ios,
                           color: Color(0xFF7B2D8B),
+                          size: 18,
                         ),
                       ),
-                      Row(
+                      const SizedBox(width: 12),
+
+                      // ── Avatar bot ──
+                      Container(
+                        width: 45,
+                        height: 45,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF7B2D8B),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.smart_toy,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2E9E6E),
-                              shape: BoxShape.circle,
+                          Text(
+                            provider.langue == 'fr'
+                                ? 'Assistant Njangi'
+                                : 'Njangi Assistant',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF7B2D8B),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'En ligne',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF2E9E6E),
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2E9E6E),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                provider.langue == 'fr' ? 'En ligne' : 'Online',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF2E9E6E),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 24),
-
-            // ── Questions rapides ──
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildQuestionRapide('Comment créer une tontine ?'),
-                  _buildQuestionRapide('Comment rejoindre une tontine ?'),
-                  _buildQuestionRapide('Comment payer ?'),
-                  _buildQuestionRapide('How does it work?'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── Liste des messages ──
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  return _buildMessage(_messages[index]);
-                },
-              ),
-            ),
-
-            // ── Indicateur de chargement ──
-            if (_isLoading)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 45,
-                      height: 45,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF7B2D8B),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.smart_toy,
-                        color: Colors.white,
-                        size: 26,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildDot(0),
-                          const SizedBox(width: 4),
-                          _buildDot(1),
-                          const SizedBox(width: 4),
-                          _buildDot(2),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-            // ── Champ de saisie ──
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      textCapitalization: TextCapitalization.sentences,
-                      onSubmitted: (_) => _envoyerMessage(),
-                      decoration: InputDecoration(
-                        hintText: 'Posez votre question...',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
+                const Divider(height: 24),
+
+                // ── Questions rapides ──
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      _buildQuestionRapide(
+                        provider.langue == 'fr'
+                            ? 'Comment créer une tontine ?'
+                            : 'How to create a tontine?',
+                      ),
+                      _buildQuestionRapide(
+                        provider.langue == 'fr'
+                            ? 'Comment rejoindre une tontine ?'
+                            : 'How to join a tontine?',
+                      ),
+                      _buildQuestionRapide(
+                        provider.langue == 'fr'
+                            ? 'Comment payer ?'
+                            : 'How to pay?',
+                      ),
+                      _buildQuestionRapide(
+                        provider.langue == 'fr'
+                            ? 'Comment ça marche ?'
+                            : 'How does it work?',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // ── Liste des messages ──
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      return _buildMessage(_messages[index]);
+                    },
+                  ),
+                ),
+
+                // ── Indicateur de chargement ──
+                if (_isLoading)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 45,
+                          height: 45,
+                          decoration: const BoxDecoration(
                             color: Color(0xFF7B2D8B),
-                            width: 1.5,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy,
+                            color: Colors.white,
+                            size: 26,
                           ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildDot(),
+                              const SizedBox(width: 4),
+                              _buildDot(),
+                              const SizedBox(width: 4),
+                              _buildDot(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // ── Champ de saisie ──
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          textCapitalization: TextCapitalization.sentences,
+                          onSubmitted: (_) => _envoyerMessage(),
+                          decoration: InputDecoration(
+                            hintText: provider.langue == 'fr'
+                                ? 'Posez votre question...'
+                                : 'Ask your question...',
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF7B2D8B),
+                                width: 1.5,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                      const SizedBox(width: 8),
 
-                  // ── Bouton envoyer ──
-                  GestureDetector(
-                    onTap: _envoyerMessage,
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF7B2D8B),
-                        shape: BoxShape.circle,
+                      // ── Bouton envoyer ──
+                      GestureDetector(
+                        onTap: _envoyerMessage,
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF7B2D8B),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  // ── Widget message ──
   Widget _buildMessage(MessageChat message) {
     final estUtilisateur = message.estUtilisateur;
 
@@ -326,7 +346,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // ── Avatar bot ──
           if (!estUtilisateur) ...[
             Container(
               width: 35,
@@ -340,7 +359,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             const SizedBox(width: 8),
           ],
 
-          // ── Bulle message ──
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -369,7 +387,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
 
-          // ── Avatar utilisateur ──
           if (estUtilisateur) ...[
             const SizedBox(width: 8),
             Container(
@@ -387,7 +404,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
-  // ── Question rapide ──
   Widget _buildQuestionRapide(String question) {
     return GestureDetector(
       onTap: () {
@@ -412,8 +428,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
-  // ── Point d'animation ──
-  Widget _buildDot(int index) {
+  Widget _buildDot() {
     return Container(
       width: 8,
       height: 8,

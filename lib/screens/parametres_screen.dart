@@ -44,13 +44,6 @@ class ParametresScreen extends StatelessWidget {
 
                   const SizedBox(height: 30),
 
-                  // ── Section Apparence ──
-                  _buildSectionTitre(textes['apparence']!),
-                  const SizedBox(height: 12),
-
-                  // ── Mode sombre ──
-                  const SizedBox(height: 24),
-
                   // ── Section Langue ──
                   _buildSectionTitre(textes['langue']!),
                   const SizedBox(height: 12),
@@ -93,9 +86,7 @@ class ParametresScreen extends StatelessWidget {
                   _buildTile(
                     context: context,
                     icon: Icons.description_outlined,
-                    titre: provider.langue == 'fr'
-                        ? 'Conditions d\'utilisation'
-                        : 'Terms of use',
+                    titre: textes['conditionsUtilisation']!,
                     trailing: const Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
@@ -107,9 +98,7 @@ class ParametresScreen extends StatelessWidget {
                   _buildTile(
                     context: context,
                     icon: Icons.privacy_tip_outlined,
-                    titre: provider.langue == 'fr'
-                        ? 'Politique de confidentialité'
-                        : 'Privacy policy',
+                    titre: textes['politiqueConfidentialite']!,
                     trailing: const Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
@@ -128,7 +117,6 @@ class ParametresScreen extends StatelessWidget {
     );
   }
 
-  // ── Titre de section ──
   Widget _buildSectionTitre(String titre) {
     return Text(
       titre,
@@ -141,7 +129,6 @@ class ParametresScreen extends StatelessWidget {
     );
   }
 
-  // ── Tile standard ──
   Widget _buildTile({
     required BuildContext context,
     required IconData icon,
@@ -171,7 +158,6 @@ class ParametresScreen extends StatelessWidget {
     );
   }
 
-  // ── Tile langue ──
   Widget _buildTileLangue({
     required BuildContext context,
     required String langue,
