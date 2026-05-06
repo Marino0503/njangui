@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.example.njangui"
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -24,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "com.example.njangui"
         minSdk = flutter.minSdkVersion        // ← valeur fixe pour Firestore
-        targetSdk = 34     // ← valeur fixe
+        targetSdk = 36   // ← valeur fixe
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

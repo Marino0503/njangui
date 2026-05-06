@@ -1,200 +1,244 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../services/user_service.dart';
 import '../services/firestore_service.dart';
 import '../models/tontine.dart';
 import 'login_screen.dart';
-import '../utils/formatage.dart';
+import 'parametres_screen.dart';
 
 class ProfilScreen extends StatelessWidget {
   const ProfilScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: StreamBuilder<Map<String, dynamic>?>(
-          stream: UserService().getProfilStream(),
-          builder: (context, profilSnapshot) {
-            if (profilSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF2E9E6E)),
-              );
-            }
+    return Consumer<AppProvider>(
+      builder: (context, provider, child) {
+        final textes = provider.textes;
 
-            final profil = profilSnapshot.data;
-            final nom = profil?['nom'] ?? 'Utilisateur';
-            final telephone = profil?['telephone'] ?? '';
+        return Scaffold(
+          body: SafeArea(
+            child: StreamBuilder<Map<String, dynamic>?>(
+              stream: UserService().getProfilStream(),
+              builder: (context, profilSnapshot) {
+                if (profilSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF2E9E6E)),
+                  );
+                }
 
-            return StreamBuilder<List<Tontine>>(
-              stream: FirestoreService().getTontines(),
-              builder: (context, tontinesSnapshot) {
-                // Compte les tontines actives
-                final tontines = tontinesSnapshot.data ?? [];
-                final nombreTontines = tontines.length;
+                final profil = profilSnapshot.data;
+                final nom = profil?['nom'] ?? 'Utilisateur';
+                final telephone = profil?['telephone'] ?? '';
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 30),
+                return StreamBuilder<List<Tontine>>(
+                  stream: FirestoreService().getTontines(),
+                  builder: (context, tontinesSnapshot) {
+                    final tontines = tontinesSnapshot.data ?? [];
+                    final nombreTontines = tontines.length;
 
-                      // ── Titre ──
-                      const Text(
-                        'Mon Profil',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // ── Photo de profil ──
-                      Stack(
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
                         children: [
-                          const CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Color(0xFF90EED4),
-                            child: Icon(
-                              Icons.person,
-                              size: 70,
-                              color: Colors.white,
+                          const SizedBox(height: 30),
+
+                          // ── Titre + bouton paramètres ──
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                provider.langue == 'fr'
+                                    ? 'Mon Profil'
+                                    : 'My Profile',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ParametresScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.settings_outlined,
+                                  color: Color(0xFF7B2D8B),
+                                  size: 26,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // ── Photo de profil ──
+                          Stack(
+                            children: [
+                              const CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Color(0xFF90EED4),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 70,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF7B2D8B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── Nom ──
+                          Text(
+                            nom,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF7B2D8B),
-                                shape: BoxShape.circle,
+
+                          const SizedBox(height: 6),
+
+                          // ── Numéro ──
+                          Text(
+                            telephone,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          // ── Informations ──
+                          _buildInfoTile(
+                            icon: Icons.person_outline,
+                            titre: provider.langue == 'fr'
+                                ? 'Nom complet'
+                                : 'Full name',
+                            valeur: nom,
+                          ),
+                          _buildInfoTile(
+                            icon: Icons.phone_outlined,
+                            titre: provider.langue == 'fr'
+                                ? 'Téléphone'
+                                : 'Phone',
+                            valeur: telephone,
+                          ),
+                          _buildInfoTile(
+                            icon: Icons.groups_outlined,
+                            titre: provider.langue == 'fr'
+                                ? 'Tontines actives'
+                                : 'Active tontines',
+                            valeur: nombreTontines.toString(),
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          // ── Bouton déconnexion ──
+                          SizedBox(
+                            width: double.infinity,
+                            height: 55,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final confirmer = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text(
+                                      provider.langue == 'fr'
+                                          ? 'Déconnexion'
+                                          : 'Sign out',
+                                    ),
+                                    content: Text(
+                                      provider.langue == 'fr'
+                                          ? 'Voulez-vous vraiment vous déconnecter ?'
+                                          : 'Are you sure you want to sign out?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: Text(
+                                          provider.langue == 'fr'
+                                              ? 'Annuler'
+                                              : 'Cancel',
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: Text(
+                                          textes['deconnexion']!,
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirmer == true) {
+                                  await UserService().deconnecter();
+                                  if (!context.mounted) return;
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const LoginScreen(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.logout),
+                              label: Text(
+                                textes['deconnexion']!,
+                                style: const TextStyle(fontSize: 16),
                               ),
-                              child: const Icon(
-                                Icons.edit,
-                                color: Colors.white,
-                                size: 16,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade400,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                elevation: 0,
                               ),
                             ),
                           ),
+
+                          const SizedBox(height: 30),
                         ],
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // ── Nom ──
-                      Text(
-                        nom,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // ── Numéro ──
-                      Text(
-                        telephone,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      // ── Informations ──
-                      _buildInfoTile(
-                        icon: Icons.person_outline,
-                        titre: 'Nom complet',
-                        valeur: nom,
-                      ),
-                      _buildInfoTile(
-                        icon: Icons.phone_outlined,
-                        titre: 'Téléphone',
-                        valeur: Formatage.telephone(telephone),
-                      ),
-                      // ── Tontines actives depuis Firestore ──
-                      _buildInfoTile(
-                        icon: Icons.groups_outlined,
-                        titre: 'Tontines actives',
-                        valeur: nombreTontines.toString(),
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      // ── Bouton déconnexion ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final confirmer = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Déconnexion'),
-                                content: const Text(
-                                  'Voulez-vous vraiment vous déconnecter ?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Annuler'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text(
-                                      'Déconnecter',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-
-                            if (confirmer == true) {
-                              await UserService().deconnecter();
-
-                              if (!context.mounted) return;
-
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const LoginScreen(),
-                                ),
-                                (route) => false,
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.logout),
-                          label: const Text(
-                            'Se déconnecter',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade400,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
