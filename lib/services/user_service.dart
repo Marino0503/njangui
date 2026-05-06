@@ -68,4 +68,12 @@ class UserService {
   Future<void> deconnecter() async {
     await _auth.signOut();
   }
+
+  // Sauvegarde la photo de profil en Base64
+  Future<void> sauvegarderPhoto(String base64Photo) async {
+    final uid = currentUserId;
+    if (uid == null) return;
+
+    await _users.doc(uid).update({'photoBase64': base64Photo});
+  }
 }

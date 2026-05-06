@@ -1,9 +1,8 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+/*import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificationService {
-  // Singleton
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
@@ -11,83 +10,56 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  // Initialise le service
   Future<void> initialiser() async {
     tz_data.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
     const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
+      android: AndroidInitializationSettings('@drawable/ic_notification'),
+      iOS: DarwinInitializationSettings(),
     );
 
     await _notifications.initialize(
       settings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {},
+      onDidReceiveNotificationResponse: (NotificationResponse r) {},
     );
   }
 
-  // Demande la permission Android
   Future<void> demanderPermission() async {
-    final plugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    if (plugin != null) {
-      await plugin.requestNotificationsPermission();
-    }
+    // Permission gérée automatiquement
   }
 
-  // Envoie une notification immédiate
   Future<void> envoyerNotification({
     required int id,
     required String titre,
     required String message,
   }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'njangi_channel',
-          'Njangi Notifications',
-          channelDescription: 'Notifications de l\'app Njangi',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
+    // ── Sans icône personnalisée ──
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'njangi_channel',
+        'Njangi Notifications',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
       iOS: DarwinNotificationDetails(),
     );
 
     await _notifications.show(id, titre, message, details);
   }
 
-  // Programme un rappel
   Future<void> programmerRappel({
     required int id,
     required String titre,
     required String message,
     required DateTime dateRappel,
   }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'njangi_rappels',
-          'Rappels Njangi',
-          channelDescription: 'Rappels de paiement Njangi',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'njangi_rappels',
+        'Rappels Njangi',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
       iOS: DarwinNotificationDetails(),
     );
 
@@ -103,16 +75,15 @@ class NotificationService {
     );
   }
 
-  // Programme les rappels pour une tontine
   Future<void> programmerRappelsTontines({
     required String nomTontine,
     required double montant,
     required DateTime dateEcheance,
     required String langue,
   }) async {
-    final String montantFormate = '${montant.toStringAsFixed(0)} FCFA';
+    final montantFormate = '${montant.toStringAsFixed(0)} FCFA';
 
-    final DateTime veille = DateTime(
+    final veille = DateTime(
       dateEcheance.year,
       dateEcheance.month,
       dateEcheance.day - 1,
@@ -120,7 +91,7 @@ class NotificationService {
       0,
     );
 
-    final DateTime jourMeme = DateTime(
+    final jourMeme = DateTime(
       dateEcheance.year,
       dateEcheance.month,
       dateEcheance.day,
@@ -153,13 +124,44 @@ class NotificationService {
     }
   }
 
-  // Annule un rappel
   Future<void> annulerRappel(int id) async {
     await _notifications.cancel(id);
   }
 
-  // Annule tous les rappels
   Future<void> annulerTousLesRappels() async {
     await _notifications.cancelAll();
   }
+}*/
+
+class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
+  Future<void> initialiser() async {}
+
+  Future<void> demanderPermission() async {}
+
+  Future<void> envoyerNotification({
+    required int id,
+    required String titre,
+    required String message,
+  }) async {
+    // Les notifications sont gérées via Firestore
+    print('Notification : $titre - $message');
+  }
+
+  Future<void> programmerRappelsTontines({
+    required String nomTontine,
+    required double montant,
+    required DateTime dateEcheance,
+    required String langue,
+  }) async {
+    // Les rappels sont gérés via Firestore
+    print('Rappel programmé pour $nomTontine');
+  }
+
+  Future<void> annulerRappel(int id) async {}
+
+  Future<void> annulerTousLesRappels() async {}
 }
