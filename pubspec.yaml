@@ -58,6 +58,34 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.0
+
+flutter_launcher_icons:
+  android: true # Génère pour Android
+  ios: true # Génère pour iOS
+  image_path: "assets/images/njangi_logo.png" # Image source (1024x1024 recommandé)
+
+  # Android 12+ uniquement (icône adaptative)
+  adaptive_icon_background: "#FFFFFF" # Couleur de fond derrière l'icône
+  # adaptive_icon_foreground: "assets/logo_app_foreground.png"  # Logo centré
+
+flutter_native_splash:
+  # Couleur de fond du splash
+  color: "#FFFFFF"
+
+  # Logo affiché au centre du splash
+  image: assets/images/njangi_logo.png
+
+  # Android 12+ (nouveau système de splash natif)
+  android_12:
+    image: assets/images/njangi_logo.png
+    icon_background_color: "#FFFFFF" # Fond derrière l'icône ronde
+    color: "#FFFFFF" # Couleur générale du splash
+
+  # Garder le splash actif jusqu'à ce que Flutter soit prêt
+  fullscreen: false
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -68,7 +96,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/njangi_logo.PNG
+    - assets/images/njangi_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
