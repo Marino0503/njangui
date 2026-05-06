@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/notification_service.dart';
 
 class ParametresScreen extends StatelessWidget {
   const ParametresScreen({super.key});
@@ -71,6 +72,48 @@ class ParametresScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 24),
+
+                  // ── Section Test notifications ──
+                  _buildSectionTitre(
+                    provider.langue == 'fr' ? 'Notifications' : 'Notifications',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildTile(
+                    context: context,
+                    icon: Icons.notifications_active_outlined,
+                    titre: provider.langue == 'fr'
+                        ? 'Tester les notifications'
+                        : 'Test notifications',
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    onTap: () async {
+                      await NotificationService().envoyerNotification(
+                        id: 1,
+                        titre: provider.langue == 'fr'
+                            ? '🔔 Test Njangi'
+                            : '🔔 Njangi Test',
+                        message: provider.langue == 'fr'
+                            ? 'Les notifications fonctionnent correctement !'
+                            : 'Notifications are working correctly!',
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            provider.langue == 'fr'
+                                ? 'Notification envoyée !'
+                                : 'Notification sent!',
+                          ),
+                          backgroundColor: const Color(0xFF2E9E6E),
+                        ),
+                      );
+                    },
+                  ),
 
                   // ── Section À propos ──
                   _buildSectionTitre(textes['apropos']!),

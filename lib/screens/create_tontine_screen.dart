@@ -5,6 +5,7 @@ import '../models/tontine.dart';
 import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import '../utils/formatage.dart';
+import '../services/notification_service.dart';
 
 class CreateTontineScreen extends StatefulWidget {
   const CreateTontineScreen({super.key});
@@ -144,6 +145,13 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
       );
 
       await FirestoreService().creerTontine(nouvelleTontine);
+      // ── Programme le rappel automatique ──
+      await NotificationService().programmerRappelsTontines(
+        nomTontine: nouvelleTontine.nom,
+        montant: nouvelleTontine.montant,
+        dateEcheance: nouvelleTontine.dateDebut,
+        langue: provider.langue,
+      );
 
       await FirestoreService().creerNotification(
         NotificationModel(
