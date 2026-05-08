@@ -75,11 +75,11 @@ flutter_native_splash:
   color: "#FFFFFF"
 
   # Logo affiché au centre du splash
-  image: assets/images/njangi_logo.png
+  image: assets/images/njangi_logo.PNG
 
   # Android 12+ (nouveau système de splash natif)
   android_12:
-    image: assets/images/njangi_logo.png
+    image: assets/images/njangi_logo.PNG
     icon_background_color: "#FFFFFF" # Fond derrière l'icône ronde
     color: "#FFFFFF" # Couleur générale du splash
 
@@ -96,7 +96,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/njangi_logo.png
+    - assets/images/njangi_logo.PNG
 
   # To add assets to your application, add an assets section, like this:
   # assets:
