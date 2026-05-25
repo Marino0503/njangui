@@ -297,6 +297,83 @@ class StatistiquesScreen extends StatelessWidget {
                             },
                           ),
 
+                          // ── Prêts en cours ──
+                          Text(
+                            provider.langue == 'fr'
+                                ? 'Prêts en cours'
+                                : 'Active loans',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFFF8C00),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      provider.langue == 'fr'
+                                          ? 'Prêts actifs'
+                                          : 'Active loans',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${stats['nombrePretsEnCours'] ?? 0}',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFFF8C00),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      provider.langue == 'fr'
+                                          ? 'Total prêté'
+                                          : 'Total loaned',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    Text(
+                                      Formatage.montant(
+                                        ((stats['totalPrets'] ?? 0) as num)
+                                            .toDouble(),
+                                      ),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFFF8C00),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
                           const SizedBox(height: 30),
                         ],
                       );

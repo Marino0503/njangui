@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/tontine.dart';
 import '../models/notification_model.dart';
 import '../models/paiement.dart';
+import '../models/pret.dart';
 
 class FirestoreService {
   // Singleton
@@ -260,12 +261,28 @@ class FirestoreService {
         }
       }
 
+      // Prêts
+      final pretsSnapshot = await _prets.get();
+      int nombrePretsEnCours = 0;
+      double totalPrets = 0;
+
+      for (var doc in pretsSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data['statut'] != StatutPret.rembourse.index &&
+            data['statut'] != StatutPret.refuse.index) {
+          nombrePretsEnCours++;
+          totalPrets += (data['montant'] as num).toDouble();
+        }
+      }
+
       return {
         'nombreTontines': nombreTontines,
         'nombreMembres': nombreMembres,
         'totalPaye': totalPaye,
         'nombrePaies': nombrePaies,
         'nombreRetards': nombreRetards,
+        'nombrePretsEnCours': nombrePretsEnCours,
+        'totalPrets': totalPrets,
       };
     });
   }
@@ -338,5 +355,95 @@ class FirestoreService {
     }).toList();
 
     await _tontines.doc(tontineId).update({'tours': tours});
+  }
+  // ════════════════════════════════════════
+  //           PRÊTS
+  // ════════════════════════════════════════
+
+  CollectionReference get _prets => _db.collection('prets');
+
+  // Créer une demande de prêt
+  Future<void> creerPret(Pret pret) async {
+    await _prets.doc(pret.id).set(pret.toMap());
+  }
+
+  // Récupérer les prêts d'une tontine
+  Stream<List<Pret>> getPretsTontine(String tontineId) {
+    return _prets.where('tontineId', isEqualTo: tontineId).snapshots().map((
+      snapshot,
+    ) {
+      return snapshot.docs
+          .map((doc) => Pret.fromMap(doc.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.dateDemande.compareTo(a.dateDemande));
+    });
+  }
+
+  // Récupérer tous les prêts
+  Stream<List<Pret>> getTousPrets() {
+    return _prets.snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Pret.fromMap(doc.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.dateDemande.compareTo(a.dateDemande));
+    });
+  }
+
+  // Accepter un prêt
+  Future<void> accepterPret(String pretId) async {
+    final dateAcceptation = DateTime.now();
+    final pret = await _prets.doc(pretId).get();
+    final data = pret.data() as Map<String, dynamic>;
+    final dureeEnMois = data['dureeEnMois'] as int;
+
+    await _prets.doc(pretId).update({
+      'statut': StatutPret.accepte.index,
+      'dateAcceptation': dateAcceptation.toIso8601String(),
+      'dateEcheance': DateTime(
+        dateAcceptation.year,
+        dateAcceptation.month + dureeEnMois,
+        dateAcceptation.day,
+      ).toIso8601String(),
+    });
+  }
+
+  // Refuser un prêt
+  Future<void> refuserPret(String pretId) async {
+    await _prets.doc(pretId).update({'statut': StatutPret.refuse.index});
+  }
+
+  // Ajouter un remboursement
+  Future<void> ajouterRemboursement(
+    String pretId,
+    Remboursement remboursement,
+  ) async {
+    final doc = await _prets.doc(pretId).get();
+    final data = doc.data() as Map<String, dynamic>;
+    final rembs = (data['remboursements'] as List<dynamic>? ?? []);
+    rembs.add(remboursement.toMap());
+
+    // Calcul montant total et remboursé
+    final montant = (data['montant'] as num).toDouble();
+    final tauxInteret = (data['tauxInteret'] as num).toDouble();
+    final montantTotal = montant + (montant * tauxInteret / 100);
+    final montantRembourse = rembs.fold<double>(
+      0,
+      (sum, r) => sum + (r['montant'] as num).toDouble(),
+    );
+
+    // Met à jour le statut si remboursé
+    final nouveauStatut = montantRembourse >= montantTotal
+        ? StatutPret.rembourse.index
+        : StatutPret.enCours.index;
+
+    await _prets.doc(pretId).update({
+      'remboursements': rembs,
+      'statut': nouveauStatut,
+    });
+  }
+
+  // Supprimer un prêt
+  Future<void> supprimerPret(String pretId) async {
+    await _prets.doc(pretId).delete();
   }
 }
