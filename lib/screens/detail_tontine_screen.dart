@@ -13,6 +13,7 @@ import 'historique_paiements_screen.dart';
 import 'ajouter_membre_screen.dart';
 import 'paiement_screen.dart';
 import 'tours_screen.dart';
+import 'prets_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -570,6 +571,57 @@ class DetailTontineScreen extends StatelessWidget {
                 // ── Boutons en bas ──
                 Column(
                   children: [
+                    // ── Bouton Prêts ──
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PretsScreen(tontine: tontine),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 20,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF8C00),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.account_balance_outlined,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  provider.langue == 'fr'
+                                      ? 'Gestion des prêts'
+                                      : 'Loan management',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     // ── Bouton Tours ──
                     GestureDetector(
                       onTap: () {
