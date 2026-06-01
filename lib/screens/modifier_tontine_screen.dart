@@ -21,6 +21,7 @@ class _ModifierTontineScreenState extends State<ModifierTontineScreen> {
   late bool _prevuesObligatoires;
   late bool _membresVoientHistorique;
   bool _isLoading = false;
+  String _frequenceEcheance = 'semaine';
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _ModifierTontineScreenState extends State<ModifierTontineScreen> {
     _paiementsEnregistres = widget.tontine.paiementsEnregistres;
     _prevuesObligatoires = widget.tontine.prevuesObligatoires;
     _membresVoientHistorique = widget.tontine.membresVoientHistorique;
+    _frequenceEcheance = widget.tontine.frequenceEcheance;
   }
 
   @override
@@ -101,6 +103,7 @@ class _ModifierTontineScreenState extends State<ModifierTontineScreen> {
         nom: _nomController.text.trim(),
         montant: montant,
         frequence: _frequence,
+        frequenceEcheance: _frequenceEcheance,
         prochaineEcheance: widget.tontine.prochaineEcheance,
         enCours: widget.tontine.enCours,
         dateDebut: widget.tontine.dateDebut,

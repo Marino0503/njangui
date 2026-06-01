@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset('assets/images/njangi_logo.png', height: 80),
+                  Image.asset('assets/images/njangi_logo.PNG', height: 80),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

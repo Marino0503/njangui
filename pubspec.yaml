@@ -64,7 +64,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true # Génère pour Android
   ios: true # Génère pour iOS
-  image_path: "assets/images/njangi_logo.png" # Image source (1024x1024 recommandé)
+  image_path: "assets/images/njangi_logo.PNG" # Image source (1024x1024 recommandé)
 
   # Android 12+ uniquement (icône adaptative)
   adaptive_icon_background: "#FFFFFF" # Couleur de fond derrière l'icône

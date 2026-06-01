@@ -27,6 +27,7 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
   bool _prevuesObligatoires = true;
   bool _membresVoientHistorique = true;
   bool _isLoading = false;
+  String _frequenceEcheance = 'semaine';
 
   @override
   void dispose() {
@@ -130,6 +131,7 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
         nom: _nomController.text.trim(),
         montant: montant,
         frequence: _frequence,
+        frequenceEcheance: _frequenceEcheance,
         prochaineEcheance: Formatage.date(_dateDebut),
         enCours: false,
         dateDebut: _dateDebut,
@@ -145,7 +147,10 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
       );
 
       await FirestoreService().creerTontine(nouvelleTontine);
-      // ── Programme le rappel automatique ──
+
+      await FirestoreService().mettreAJourProchaineEcheance(
+        nouvelleTontine.id,
+      ); // ── Programme le rappel automatique ──
       await NotificationService().programmerRappelsTontines(
         nomTontine: nouvelleTontine.nom,
         montant: nouvelleTontine.montant,
@@ -289,6 +294,14 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                               isExpanded: true,
                               items: [
                                 DropdownMenuItem(
+                                  value: 'jour',
+                                  child: Text(
+                                    provider.langue == 'fr'
+                                        ? 'Chaque jour'
+                                        : 'Every day',
+                                  ),
+                                ),
+                                DropdownMenuItem(
                                   value: 'semaine',
                                   child: Text(
                                     provider.langue == 'fr'
@@ -315,6 +328,56 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                               ],
                               onChanged: (value) {
                                 setState(() => _frequence = value!);
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // ── Fréquence d'échéance ──
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _frequenceEcheance,
+                              isExpanded: true,
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'semaine',
+                                  child: Text(
+                                    provider.langue == 'fr'
+                                        ? 'Échéance hebdomadaire'
+                                        : 'Weekly deadline',
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'mois',
+                                  child: Text(
+                                    provider.langue == 'fr'
+                                        ? 'Échéance mensuelle'
+                                        : 'Monthly deadline',
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'trimestre',
+                                  child: Text(
+                                    provider.langue == 'fr'
+                                        ? 'Échéance trimestrielle'
+                                        : 'Quarterly deadline',
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                setState(() => _frequenceEcheance = value!);
                               },
                             ),
                           ),

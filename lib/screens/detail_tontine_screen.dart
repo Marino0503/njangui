@@ -14,6 +14,7 @@ import 'ajouter_membre_screen.dart';
 import 'paiement_screen.dart';
 import 'tours_screen.dart';
 import 'prets_screen.dart';
+import 'flux_financiers_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -61,7 +62,11 @@ class DetailTontineScreen extends StatelessWidget {
       );
 
       await FirestoreService().enregistrerPaiement(paiement);
-
+      await FirestoreService().mettreAJourFluxFinanciers(
+        tontineId: tontine.id,
+        montantPaiement: tontine.montant,
+        typeFlux: !membre.aPaye ? 'paiement' : 'retrait',
+      );
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -122,7 +127,6 @@ class DetailTontineScreen extends StatelessWidget {
               Navigator.pop(context);
               try {
                 await FirestoreService().supprimerMembre(tontine.id, membre.id);
-
                 await FirestoreService().creerNotification(
                   NotificationModel(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -133,7 +137,6 @@ class DetailTontineScreen extends StatelessWidget {
                     type: TypeNotification.nouveauMembre,
                   ),
                 );
-
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -186,6 +189,19 @@ class DetailTontineScreen extends StatelessWidget {
               Navigator.pop(context);
               try {
                 await FirestoreService().supprimerTontine(tontine.id);
+                await FirestoreService().creerNotification(
+                  NotificationModel(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    titre: provider.langue == 'fr'
+                        ? 'Tontine supprimée'
+                        : 'Tontine deleted',
+                    message: provider.langue == 'fr'
+                        ? 'Vous avez supprimé la tontine "${tontine.nom}"'
+                        : 'You deleted the tontine "${tontine.nom}"',
+                    date: DateTime.now(),
+                    type: TypeNotification.nouvelleTontine,
+                  ),
+                );
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -216,155 +232,125 @@ class DetailTontineScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, provider, child) {
-        final textes = provider.textes;
+    return StreamBuilder<Tontine?>(
+      stream: FirestoreService().getTontineStream(tontine.id),
+      builder: (context, snapshot) {
+        final tontineActuelle = snapshot.data ?? tontine;
 
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 20),
+        return Consumer<AppProvider>(
+          builder: (context, provider, child) {
+            final textes = provider.textes;
 
-                        // ── Bouton retour + Titre + Menu ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            return Scaffold(
+              backgroundColor: Colors.white,
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.arrow_back_ios,
-                                    color: Color(0xFF7B2D8B),
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    tontine.nom,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF7B2D8B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: const Icon(
-                                Icons.more_vert,
-                                color: Color(0xFF7B2D8B),
-                              ),
-                              onSelected: (value) async {
-                                if (value == 'modifier') {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          ModifierTontineScreen(
-                                            tontine: tontine,
-                                          ),
-                                    ),
-                                  );
-                                } else if (value == 'supprimer') {
-                                  _confirmerSuppression(context);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'modifier',
+                            const SizedBox(height: 20),
+
+                            // ── Bouton retour + Titre + Menu ──
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
                                   child: Row(
                                     children: [
                                       const Icon(
-                                        Icons.edit,
+                                        Icons.arrow_back_ios,
                                         color: Color(0xFF7B2D8B),
+                                        size: 18,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(textes['modifier']!),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'supprimer',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.delete,
-                                        color: Colors.red,
-                                      ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 6),
                                       Text(
-                                        textes['supprimer']!,
+                                        tontineActuelle.nom,
                                         style: const TextStyle(
-                                          color: Colors.red,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF7B2D8B),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(
+                                    Icons.more_vert,
+                                    color: Color(0xFF7B2D8B),
+                                  ),
+                                  onSelected: (value) async {
+                                    if (value == 'modifier') {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              ModifierTontineScreen(
+                                                tontine: tontineActuelle,
+                                              ),
+                                        ),
+                                      );
+                                    } else if (value == 'supprimer') {
+                                      _confirmerSuppression(context);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'modifier',
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.edit,
+                                            color: Color(0xFF7B2D8B),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(textes['modifier']!),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'supprimer',
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            textes['supprimer']!,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
-                        ),
 
-                        const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                        // ── Montant ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                textes['montant']!,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
+                            // ── Montant ──
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                Formatage.montant(tontine.montant),
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // ── Gestionnaire ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    textes['gestionnaire']!,
+                                    textes['montant']!,
                                     style: const TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey,
@@ -372,45 +358,33 @@ class DetailTontineScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    tontine.gestionnaire,
+                                    Formatage.montant(tontineActuelle.montant),
                                     style: const TextStyle(
-                                      fontSize: 22,
+                                      fontSize: 24,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
                               ),
-                              const CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Color(0xFF90EED4),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 35,
-                                  color: Colors.white,
-                                ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Date de création ──
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // ── Code d'invitation ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    textes['codeInvitation']!,
+                                    provider.langue == 'fr'
+                                        ? 'Date de création'
+                                        : 'Creation date',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey,
@@ -418,358 +392,513 @@ class DetailTontineScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    tontine.codeInvitation,
+                                    _formaterDate(tontineActuelle.dateDebut),
                                     style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 6,
-                                      color: Color(0xFF2E9E6E),
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
                               ),
-                              Row(
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Gestionnaire ──
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  IconButton(
-                                    onPressed: () {
-                                      Clipboard.setData(
-                                        ClipboardData(
-                                          text: tontine.codeInvitation,
-                                        ),
-                                      );
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(textes['codeCopie']!),
-                                          backgroundColor: const Color(
-                                            0xFF2E9E6E,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(
-                                      Icons.copy,
-                                      color: Color(0xFF7B2D8B),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    onPressed: () async {
-                                      await SharePlus.instance.share(
-                                        ShareParams(
-                                          text: provider.langue == 'fr'
-                                              ? '🎉 Rejoins ma tontine "${tontine.nom}" sur Njangi !\n\n📱 Code : ${tontine.codeInvitation}\n\n💰 ${Formatage.montant(tontine.montant)}/${tontine.frequence}'
-                                              : '🎉 Join my tontine "${tontine.nom}" on Njangi!\n\n📱 Code: ${tontine.codeInvitation}\n\n💰 ${Formatage.montant(tontine.montant)}/${tontine.frequence}',
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(
-                                      Icons.share,
-                                      color: Color(0xFF7B2D8B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // ── Membres ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${textes['membres']} (${tontine.membres.length}/${tontine.nombreMembres})',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          AjouterMembreScreen(tontine: tontine),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2E9E6E),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(
-                                        Icons.add,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 4),
                                       Text(
-                                        textes['ajouter']!,
+                                        textes['gestionnaire']!,
                                         style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
+                                          fontSize: 14,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        tontineActuelle.gestionnaire,
+                                        style: const TextStyle(
+                                          fontSize: 22,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
                                   ),
+                                  const CircleAvatar(
+                                    radius: 30,
+                                    backgroundColor: Color(0xFF90EED4),
+                                    child: Icon(
+                                      Icons.person,
+                                      size: 35,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Code d'invitation ──
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        textes['codeInvitation']!,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        tontineActuelle.codeInvitation,
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 6,
+                                          color: Color(0xFF2E9E6E),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () {
+                                          Clipboard.setData(
+                                            ClipboardData(
+                                              text: tontineActuelle
+                                                  .codeInvitation,
+                                            ),
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                textes['codeCopie']!,
+                                              ),
+                                              backgroundColor: const Color(
+                                                0xFF2E9E6E,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.copy,
+                                          color: Color(0xFF7B2D8B),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        onPressed: () async {
+                                          await SharePlus.instance.share(
+                                            ShareParams(
+                                              text: provider.langue == 'fr'
+                                                  ? '🎉 Rejoins ma tontine "${tontineActuelle.nom}" sur Njangi !\n\n📱 Code : ${tontineActuelle.codeInvitation}\n\n💰 ${Formatage.montant(tontineActuelle.montant)}/${tontineActuelle.frequence}'
+                                                  : '🎉 Join my tontine "${tontineActuelle.nom}" on Njangi!\n\n📱 Code: ${tontineActuelle.codeInvitation}\n\n💰 ${Formatage.montant(tontineActuelle.montant)}/${tontineActuelle.frequence}',
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.share,
+                                          color: Color(0xFF7B2D8B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Membres ──
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '${textes['membres']} (${tontineActuelle.membres.length}/${tontineActuelle.nombreMembres})',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              AjouterMembreScreen(
+                                                tontine: tontineActuelle,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2E9E6E),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.add,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            textes['ajouter']!,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Liste des membres ──
+                            tontineActuelle.membres.isEmpty
+                                ? Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      provider.langue == 'fr'
+                                          ? 'Aucun membre pour l\'instant'
+                                          : 'No members yet',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  )
+                                : Column(
+                                    children: tontineActuelle.membres
+                                        .map(
+                                          (m) => _buildMembreTile(m, context),
+                                        )
+                                        .toList(),
+                                  ),
+
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // ── Boutons en bas ──
+                    Column(
+                      children: [
+                        // ── Bouton Flux financiers ──
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FluxFinanciersScreen(
+                                  tontine: tontineActuelle,
                                 ),
                               ),
-                            ],
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 20,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF2E8B57),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.account_balance,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      provider.langue == 'fr'
+                                          ? 'Flux financiers'
+                                          : 'Financial flows',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
 
-                        const SizedBox(height: 12),
-
-                        // ── Liste des membres ──
-                        tontine.membres.isEmpty
-                            ? Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  provider.langue == 'fr'
-                                      ? 'Aucun membre pour l\'instant'
-                                      : 'No members yet',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                              )
-                            : Column(
-                                children: tontine.membres
-                                    .map((m) => _buildMembreTile(m, context))
-                                    .toList(),
+                        // ── Bouton Prêts ──
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    PretsScreen(tontine: tontineActuelle),
                               ),
-
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // ── Boutons en bas ──
-                Column(
-                  children: [
-                    // ── Bouton Prêts ──
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PretsScreen(tontine: tontine),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF8C00),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 20,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFF8C00),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(
-                                  Icons.account_balance_outlined,
-                                  color: Colors.white,
-                                  size: 22,
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.account_balance_outlined,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      provider.langue == 'fr'
+                                          ? 'Gestion des prêts'
+                                          : 'Loan management',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  provider.langue == 'fr'
-                                      ? 'Gestion des prêts'
-                                      : 'Loan management',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ],
                             ),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 18,
+                          ),
+                        ),
+
+                        // ── Bouton Tours ──
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ToursScreen(tontine: tontineActuelle),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 20,
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // ── Bouton Tours ──
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ToursScreen(tontine: tontine),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF7B2D8B),
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            topRight: Radius.circular(20),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF7B2D8B),
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(
-                                  Icons.rotate_right,
-                                  color: Colors.white,
-                                  size: 22,
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.rotate_right,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      textes['gestionTours']!,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  textes['gestionTours']!,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ],
                             ),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // ── Bouton Historique ──
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                HistoriquePaiementsScreen(tontine: tontine),
                           ),
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
                         ),
-                        color: const Color(0xFF2E9E6E),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.history,
-                                  color: Colors.white,
-                                  size: 22,
+
+                        // ── Bouton Historique ──
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => HistoriquePaiementsScreen(
+                                  tontine: tontineActuelle,
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  textes['historiquesPaiements']!,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 20,
+                            ),
+                            color: const Color(0xFF2E9E6E),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.history,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      textes['historiquesPaiements']!,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white,
+                                  size: 18,
                                 ),
                               ],
                             ),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
 
-                    // ── Prochaine échéance ──
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 24,
-                        horizontal: 20,
-                      ),
-                      color: Colors.grey,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        // ── Prochaine échéance ──
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 24,
+                            horizontal: 20,
+                          ),
+                          color: Colors.grey,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                textes['prochaineEcheance']!,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    textes['prochaineEcheance']!,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'le ${tontineActuelle.prochaineEcheance}',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'le ${_formaterDate(tontine.dateDebut)}',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white,
+                                size: 24,
                               ),
                             ],
                           ),
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

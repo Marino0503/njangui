@@ -313,6 +313,15 @@ class ToursScreen extends StatelessWidget {
                       tontine.id,
                       tour.numero,
                     );
+                    await FirestoreService().mettreAJourProchaineEcheance(
+                      tontine.id,
+                    );
+                    // ── Met à jour les flux financiers ──
+                    await FirestoreService().mettreAJourFluxFinanciers(
+                      tontineId: tontine.id,
+                      montantPaiement: tour.montantTotal,
+                      typeFlux: 'distribution',
+                    );
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

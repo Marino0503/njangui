@@ -28,6 +28,7 @@ class FirestoreService {
       'nom': tontine.nom,
       'montant': tontine.montant,
       'frequence': tontine.frequence,
+      'frequenceEcheance': tontine.frequenceEcheance,
       'prochaineEcheance': tontine.prochaineEcheance,
       'enCours': tontine.enCours,
       'dateDebut': tontine.dateDebut.toIso8601String(),
@@ -43,6 +44,9 @@ class FirestoreService {
           .toList(),
       'tours': tontine.tours.map((t) => t.toMap()).toList(),
       'createdAt': FieldValue.serverTimestamp(),
+      'totalCollecte': 0,
+      'totalDistribue': 0,
+      'soldeDisponible': 0,
     });
   }
 
@@ -147,29 +151,34 @@ class FirestoreService {
       return Membre(id: m['id'], nom: m['nom'], aPaye: m['aPaye']);
     }).toList();
 
-    // ── Nouveaux tours ──
     final toursData = data['tours'] as List<dynamic>? ?? [];
     final tours = toursData.map((t) {
       return Tour.fromMap(t as Map<String, dynamic>);
     }).toList();
 
     return Tontine(
-      id: data['id'],
-      nom: data['nom'],
-      montant: (data['montant'] as num).toDouble(),
-      frequence: data['frequence'],
-      prochaineEcheance: data['prochaineEcheance'],
-      enCours: data['enCours'],
-      dateDebut: DateTime.parse(data['dateDebut']),
-      ordreReception: data['ordreReception'],
-      nombreMembres: data['nombreMembres'],
-      paiementsEnregistres: data['paiementsEnregistres'],
-      prevuesObligatoires: data['prevuesObligatoires'],
-      membresVoientHistorique: data['membresVoientHistorique'],
-      gestionnaire: data['gestionnaire'],
-      codeInvitation: data['codeInvitation'],
+      id: data['id'] ?? '',
+      nom: data['nom'] ?? '',
+      montant: (data['montant'] as num? ?? 0).toDouble(),
+      frequence: data['frequence'] ?? 'mois',
+      frequenceEcheance: data['frequenceEcheance'] ?? 'semaine',
+      prochaineEcheance: data['prochaineEcheance'] ?? '',
+      enCours: data['enCours'] ?? false,
+      dateDebut: DateTime.parse(
+        data['dateDebut'] ?? DateTime.now().toIso8601String(),
+      ),
+      ordreReception: data['ordreReception'] ?? 'aleatoire',
+      nombreMembres: data['nombreMembres'] ?? 0,
+      paiementsEnregistres: data['paiementsEnregistres'] ?? true,
+      prevuesObligatoires: data['prevuesObligatoires'] ?? true,
+      membresVoientHistorique: data['membresVoientHistorique'] ?? true,
+      gestionnaire: data['gestionnaire'] ?? '',
+      codeInvitation: data['codeInvitation'] ?? '',
       membres: membres,
       tours: tours,
+      totalCollecte: (data['totalCollecte'] as num? ?? 0).toDouble(),
+      totalDistribue: (data['totalDistribue'] as num? ?? 0).toDouble(),
+      soldeDisponible: (data['soldeDisponible'] as num? ?? 0).toDouble(),
     );
   }
 
@@ -445,5 +454,152 @@ class FirestoreService {
   // Supprimer un prêt
   Future<void> supprimerPret(String pretId) async {
     await _prets.doc(pretId).delete();
+  }
+
+  // ════════════════════════════════════════
+  //           FLUX FINANCIERS
+  // ════════════════════════════════════════
+
+  // Mettre à jour les flux financiers d'une tontine
+  Future<void> mettreAJourFluxFinanciers({
+    required String tontineId,
+    required double montantPaiement,
+    required String typeFlux, // 'paiement', 'distribution', 'pret'
+  }) async {
+    final doc = await _tontines.doc(tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+
+    double totalCollecte = (data['totalCollecte'] as num? ?? 0).toDouble();
+    double totalDistribue = (data['totalDistribue'] as num? ?? 0).toDouble();
+    double soldeDisponible = (data['soldeDisponible'] as num? ?? 0).toDouble();
+
+    switch (typeFlux) {
+      case 'paiement':
+        totalCollecte += montantPaiement;
+        soldeDisponible += montantPaiement;
+        break;
+      case 'distribution':
+        totalDistribue += montantPaiement;
+        soldeDisponible -= montantPaiement;
+        break;
+      case 'pret':
+        soldeDisponible -= montantPaiement;
+        break;
+    }
+
+    await _tontines.doc(tontineId).update({
+      'totalCollecte': totalCollecte,
+      'totalDistribue': totalDistribue,
+      'soldeDisponible': soldeDisponible,
+    });
+  }
+
+  // Récupérer tous les flux d'une tontine
+  Stream<List<Map<String, dynamic>>> getFluxFinanciers(String tontineId) {
+    return _paiements.where('tontineId', isEqualTo: tontineId).snapshots().map((
+      snapshot,
+    ) {
+      return snapshot.docs.map((doc) {
+        return doc.data() as Map<String, dynamic>;
+      }).toList()..sort((a, b) {
+        final dateA = DateTime.parse(a['date'] as String);
+        final dateB = DateTime.parse(b['date'] as String);
+        return dateB.compareTo(dateA);
+      });
+    });
+  }
+
+  // ════════════════════════════════════════
+  //           PROCHAINE ÉCHÉANCE
+  // ════════════════════════════════════════
+
+  // Calcule et met à jour la prochaine échéance
+  Future<void> mettreAJourProchaineEcheance(String tontineId) async {
+    final doc = await _tontines.doc(tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+
+    final tours = (data['tours'] as List<dynamic>? ?? []);
+    final frequenceEcheance = data['frequenceEcheance'] as String? ?? 'semaine';
+    final dateDebut = DateTime.parse(data['dateDebut'] as String);
+
+    DateTime prochaineEcheance;
+
+    if (tours.isEmpty) {
+      prochaineEcheance = _calculerProchaineDate(dateDebut, frequenceEcheance);
+    } else {
+      final toursNonCompletes = tours.where((t) {
+        return t['estComplete'] == false;
+      }).toList();
+
+      if (toursNonCompletes.isEmpty) {
+        prochaineEcheance = _calculerProchaineDate(
+          dateDebut,
+          frequenceEcheance,
+        );
+      } else {
+        prochaineEcheance = DateTime.parse(
+          toursNonCompletes.first['date'] as String,
+        );
+      }
+    }
+
+    const mois = [
+      'Janvier',
+      'Février',
+      'Mars',
+      'Avril',
+      'Mai',
+      'Juin',
+      'Juillet',
+      'Août',
+      'Septembre',
+      'Octobre',
+      'Novembre',
+      'Décembre',
+    ];
+    final dateFormatee =
+        '${prochaineEcheance.day} ${mois[prochaineEcheance.month - 1]}';
+
+    await _tontines.doc(tontineId).update({'prochaineEcheance': dateFormatee});
+  }
+
+  // Calcule la prochaine date selon la frequenceEcheance
+  DateTime _calculerProchaineDate(
+    DateTime dateDebut,
+    String frequenceEcheance,
+  ) {
+    DateTime prochaine;
+
+    switch (frequenceEcheance) {
+      case 'semaine':
+        prochaine = dateDebut.add(const Duration(days: 7));
+        break;
+      case 'mois':
+        prochaine = DateTime(
+          dateDebut.year,
+          dateDebut.month + 1,
+          dateDebut.day,
+        );
+        break;
+      case 'trimestre':
+        prochaine = DateTime(
+          dateDebut.year,
+          dateDebut.month + 3,
+          dateDebut.day,
+        );
+        break;
+      default:
+        prochaine = dateDebut.add(const Duration(days: 7));
+    }
+
+    return prochaine;
+  }
+
+  // Récupérer une tontine en temps réel
+  Stream<Tontine?> getTontineStream(String tontineId) {
+    return _tontines.doc(tontineId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return _tontineFromMap(doc.data() as Map<String, dynamic>);
+    });
   }
 }
