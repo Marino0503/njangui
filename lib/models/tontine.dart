@@ -28,6 +28,8 @@ class Tontine {
   final double totalDistribue;
   final double soldeDisponible;
   final List<Tour> tours;
+  final double penaliteParJour;
+  final bool sanctionsActives;
 
   Tontine({
     required this.id,
@@ -47,6 +49,8 @@ class Tontine {
     required this.membres,
     required this.codeInvitation,
     required this.tours,
+    this.penaliteParJour = 500,
+    this.sanctionsActives = false,
     this.totalCollecte = 0,
     this.totalDistribue = 0,
     this.soldeDisponible = 0,
@@ -85,6 +89,8 @@ class Tontine {
       'totalCollecte': totalCollecte,
       'totalDistribue': totalDistribue,
       'soldeDisponible': soldeDisponible,
+      'penaliteParJour': penaliteParJour,
+      'sanctionsActives': sanctionsActives,
     };
   }
 
@@ -120,6 +126,8 @@ class Tontine {
       totalCollecte: (data['totalCollecte'] as num? ?? 0).toDouble(),
       totalDistribue: (data['totalDistribue'] as num? ?? 0).toDouble(),
       soldeDisponible: (data['soldeDisponible'] as num? ?? 0).toDouble(),
+      penaliteParJour: (data['penaliteParJour'] as num? ?? 500).toDouble(),
+      sanctionsActives: data['sanctionsActives'] ?? false,
     );
   }
 }

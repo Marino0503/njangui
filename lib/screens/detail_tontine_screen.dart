@@ -15,6 +15,7 @@ import 'paiement_screen.dart';
 import 'tours_screen.dart';
 import 'prets_screen.dart';
 import 'flux_financiers_screen.dart';
+import 'sanctions_screen.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -47,6 +48,14 @@ class DetailTontineScreen extends StatelessWidget {
         }
         return m;
       }).toList();
+      // ── Vérifie et crée une sanction si le membre est en retard ──
+      if (!membre.aPaye) {
+        await FirestoreService().verifierEtCreerSanction(
+          tontine: tontine,
+          membre: membre,
+          dateEcheance: tontine.dateDebut,
+        );
+      }
 
       await FirestoreService().mettreAJourMembres(tontine.id, membresMAJ);
 
@@ -82,7 +91,6 @@ class DetailTontineScreen extends StatelessWidget {
       );
 
       if (!context.mounted) return;
-
       final provider = Provider.of<AppProvider>(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -105,7 +113,6 @@ class DetailTontineScreen extends StatelessWidget {
   void _confirmerSuppressionMembre(BuildContext context, Membre membre) {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final textes = provider.textes;
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -167,7 +174,6 @@ class DetailTontineScreen extends StatelessWidget {
   void _confirmerSuppression(BuildContext context) {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final textes = provider.textes;
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -244,10 +250,11 @@ class DetailTontineScreen extends StatelessWidget {
             return Scaffold(
               backgroundColor: Colors.white,
               body: SafeArea(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,67 +346,31 @@ class DetailTontineScreen extends StatelessWidget {
                             const SizedBox(height: 24),
 
                             // ── Montant ──
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    textes['montant']!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    Formatage.montant(tontineActuelle.montant),
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                            _buildInfoCard(
+                              label: textes['montant']!,
+                              valeur: Formatage.montant(
+                                tontineActuelle.montant,
                               ),
                             ),
 
                             const SizedBox(height: 12),
 
                             // ── Date de création ──
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    provider.langue == 'fr'
-                                        ? 'Date de création'
-                                        : 'Creation date',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _formaterDate(tontineActuelle.dateDebut),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            _buildInfoCard(
+                              label: provider.langue == 'fr'
+                                  ? 'Date de création'
+                                  : 'Creation date',
+                              valeur: _formaterDate(tontineActuelle.dateDebut),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // ── Fréquence ──
+                            _buildInfoCard(
+                              label: provider.langue == 'fr'
+                                  ? 'Fréquence de cotisation'
+                                  : 'Contribution frequency',
+                              valeur: tontineActuelle.frequence,
                             ),
 
                             const SizedBox(height: 12),
@@ -635,272 +606,234 @@ class DetailTontineScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
 
-                    // ── Boutons en bas ──
-                    Column(
-                      children: [
-                        // ── Bouton Flux financiers ──
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FluxFinanciersScreen(
-                                  tontine: tontineActuelle,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 20,
-                            ),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2E8B57),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // ── Prochaine échéance ──
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 20,
+                        ),
+                        color: Colors.grey.shade200,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.account_balance,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      provider.langue == 'fr'
-                                          ? 'Flux financiers'
-                                          : 'Financial flows',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  textes['prochaineEcheance']!,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
                                 ),
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.white,
-                                  size: 18,
+                                Text(
+                                  tontineActuelle.prochaineEcheance,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF7B2D8B),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-
-                        // ── Bouton Prêts ──
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    PretsScreen(tontine: tontineActuelle),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 20,
-                            ),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF8C00),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.account_balance_outlined,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      provider.langue == 'fr'
-                                          ? 'Gestion des prêts'
-                                          : 'Loan management',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // ── Bouton Tours ──
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ToursScreen(tontine: tontineActuelle),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 20,
-                            ),
-                            decoration: const BoxDecoration(
+                            const Icon(
+                              Icons.calendar_today,
                               color: Color(0xFF7B2D8B),
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(20),
-                                topRight: Radius.circular(20),
-                              ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // ── Boutons actions en grille ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: [
+                            // ── Ligne 1 ──
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.rotate_right,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      textes['gestionTours']!,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                Expanded(
+                                  child: _buildBoutonAction(
+                                    context: context,
+                                    titre: provider.langue == 'fr'
+                                        ? 'Flux financiers'
+                                        : 'Financial flows',
+                                    icone: Icons.account_balance,
+                                    couleur: const Color(0xFF2E8B57),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            FluxFinanciersScreen(
+                                              tontine: tontineActuelle,
+                                            ),
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.white,
-                                  size: 18,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildBoutonAction(
+                                    context: context,
+                                    titre: provider.langue == 'fr'
+                                        ? 'Gestion des prêts'
+                                        : 'Loan management',
+                                    icone: Icons.account_balance_outlined,
+                                    couleur: const Color(0xFFFF8C00),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PretsScreen(
+                                          tontine: tontineActuelle,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
 
-                        // ── Bouton Historique ──
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => HistoriquePaiementsScreen(
-                                  tontine: tontineActuelle,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 20,
-                            ),
-                            color: const Color(0xFF2E9E6E),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            const SizedBox(height: 12),
+
+                            // ── Ligne 2 ──
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.history,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      textes['historiquesPaiements']!,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                Expanded(
+                                  child: _buildBoutonAction(
+                                    context: context,
+                                    titre: textes['gestionTours']!,
+                                    icone: Icons.rotate_right,
+                                    couleur: const Color(0xFF7B2D8B),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ToursScreen(
+                                          tontine: tontineActuelle,
+                                        ),
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.white,
-                                  size: 18,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildBoutonAction(
+                                    context: context,
+                                    titre: textes['historiquesPaiements']!,
+                                    icone: Icons.history,
+                                    couleur: const Color(0xFF2E9E6E),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            HistoriquePaiementsScreen(
+                                              tontine: tontineActuelle,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
 
-                        // ── Prochaine échéance ──
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 24,
-                            horizontal: 20,
-                          ),
-                          color: Colors.grey,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    textes['prochaineEcheance']!,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Text(
-                                    'le ${tontineActuelle.prochaineEcheance}',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 12),
+
+                            // ── Ligne 3 — Sanctions ──
+                            _buildBoutonAction(
+                              context: context,
+                              titre: provider.langue == 'fr'
+                                  ? 'Sanctions'
+                                  : 'Sanctions',
+                              icone: Icons.warning_amber,
+                              couleur: Colors.red,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      SanctionsScreen(tontine: tontineActuelle),
+                                ),
                               ),
-                              const Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ],
-                          ),
+                              pleineLargeur: true,
+                            ),
+
+                            const SizedBox(height: 30),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
         );
       },
+    );
+  }
+
+  // ── Widget bouton action ──
+  Widget _buildBoutonAction({
+    required BuildContext context,
+    required String titre,
+    required IconData icone,
+    required Color couleur,
+    required VoidCallback onTap,
+    bool pleineLargeur = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: pleineLargeur ? double.infinity : null,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: couleur,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icone, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                titre,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Widget info card ──
+  Widget _buildInfoCard({required String label, required String valeur}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          const SizedBox(height: 6),
+          Text(
+            valeur,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 

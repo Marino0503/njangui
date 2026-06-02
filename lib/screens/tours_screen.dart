@@ -313,6 +313,16 @@ class ToursScreen extends StatelessWidget {
                       tontine.id,
                       tour.numero,
                     );
+
+                    // ── Envoie un rappel à tous les membres non payés ──
+                    for (final membre in tontine.membres) {
+                      if (!membre.aPaye) {
+                        await FirestoreService().envoyerRappelEcheance(
+                          tontine: tontine,
+                          membre: membre,
+                        );
+                      }
+                    }
                     await FirestoreService().mettreAJourProchaineEcheance(
                       tontine.id,
                     );

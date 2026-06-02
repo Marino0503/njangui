@@ -28,6 +28,8 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
   bool _membresVoientHistorique = true;
   bool _isLoading = false;
   String _frequenceEcheance = 'semaine';
+  double _penaliteParJour = 500;
+  bool _sanctionsActives = false;
 
   @override
   void dispose() {
@@ -150,6 +152,8 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
         ],
         codeInvitation: code,
         tours: [],
+        penaliteParJour: _penaliteParJour,
+        sanctionsActives: _sanctionsActives,
       );
 
       await FirestoreService().creerTontine(nouvelleTontine);
@@ -522,6 +526,61 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
                         const SizedBox(height: 24),
                       ],
                     ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Sanctions ──
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            provider.langue == 'fr'
+                                ? 'Activer les sanctions'
+                                : 'Enable sanctions',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          Switch(
+                            value: _sanctionsActives,
+                            activeColor: const Color(0xFF2E9E6E),
+                            onChanged: (value) {
+                              setState(() => _sanctionsActives = value);
+                            },
+                          ),
+                        ],
+                      ),
+                      if (_sanctionsActives) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          provider.langue == 'fr'
+                              ? 'Pénalité par jour de retard : ${_penaliteParJour.toStringAsFixed(0)} FCFA'
+                              : 'Penalty per day late: ${_penaliteParJour.toStringAsFixed(0)} FCFA',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        Slider(
+                          value: _penaliteParJour,
+                          min: 100,
+                          max: 5000,
+                          divisions: 49,
+                          activeColor: const Color(0xFF7B2D8B),
+                          label: '${_penaliteParJour.toStringAsFixed(0)} FCFA',
+                          onChanged: (value) {
+                            setState(() => _penaliteParJour = value);
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ),
 

@@ -3,6 +3,8 @@ import '../models/tontine.dart';
 import '../models/notification_model.dart';
 import '../models/paiement.dart';
 import '../models/pret.dart';
+import '../models/sanction.dart';
+import '../utils/formatage.dart';
 
 class FirestoreService {
   // Singleton
@@ -47,6 +49,8 @@ class FirestoreService {
       'totalCollecte': 0,
       'totalDistribue': 0,
       'soldeDisponible': 0,
+      'penaliteParJour': tontine.penaliteParJour,
+      'sanctionsActives': tontine.sanctionsActives,
     });
   }
 
@@ -601,5 +605,169 @@ class FirestoreService {
       if (!doc.exists) return null;
       return _tontineFromMap(doc.data() as Map<String, dynamic>);
     });
+  }
+
+  // ════════════════════════════════════════
+  //           SANCTIONS
+  // ════════════════════════════════════════
+
+  CollectionReference get _sanctions => _db.collection('sanctions');
+
+  // Créer une sanction
+  Future<void> creerSanction(Sanction sanction) async {
+    await _sanctions.doc(sanction.id).set(sanction.toMap());
+  }
+
+  // Récupérer les sanctions d'une tontine
+  Stream<List<Sanction>> getSanctionsTontine(String tontineId) {
+    return _sanctions.where('tontineId', isEqualTo: tontineId).snapshots().map((
+      snapshot,
+    ) {
+      return snapshot.docs
+          .map((doc) => Sanction.fromMap(doc.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.dateSanction.compareTo(a.dateSanction));
+    });
+  }
+
+  // Marquer une sanction comme payée
+  Future<void> payerSanction(String sanctionId) async {
+    await _sanctions.doc(sanctionId).update({'estPayee': true});
+  }
+
+  // Calcule le nombre de fréquences de retard
+  int _calculerNombreFrequencesRetard(DateTime dateEcheance, String frequence) {
+    final maintenant = DateTime.now();
+    final difference = maintenant.difference(dateEcheance);
+
+    switch (frequence) {
+      case 'jour':
+        return difference.inDays;
+      case 'semaine':
+        return (difference.inDays / 7).floor();
+      case 'mois':
+        return ((maintenant.year - dateEcheance.year) * 12 +
+                maintenant.month -
+                dateEcheance.month)
+            .abs();
+      case 'trimestre':
+        return (((maintenant.year - dateEcheance.year) * 12 +
+                    maintenant.month -
+                    dateEcheance.month) /
+                3)
+            .floor();
+      default:
+        return difference.inDays;
+    }
+  }
+
+  // Vérifie et crée une sanction si nécessaire
+  Future<Sanction?> verifierEtCreerSanction({
+    required Tontine tontine,
+    required Membre membre,
+    required DateTime dateEcheance,
+  }) async {
+    if (!tontine.sanctionsActives) return null;
+
+    final nombreFrequences = _calculerNombreFrequencesRetard(
+      dateEcheance,
+      tontine.frequence,
+    );
+
+    if (nombreFrequences <= 0) return null;
+
+    // Vérifie si une sanction existe déjà pour cette échéance
+    final sanctionsExistantes = await _sanctions
+        .where('tontineId', isEqualTo: tontine.id)
+        .where('membreId', isEqualTo: membre.id)
+        .where('estPayee', isEqualTo: false)
+        .get();
+
+    // Calcule le montant dû
+    final montantDu = Sanction.calculerMontantDu(
+      tontine.montant,
+      nombreFrequences,
+    );
+
+    if (sanctionsExistantes.docs.isNotEmpty) {
+      // Met à jour la sanction existante
+      final sanctionId = sanctionsExistantes.docs.first.id;
+      await _sanctions.doc(sanctionId).update({
+        'nombreFrequencesRetard': nombreFrequences,
+        'montantDu': montantDu,
+      });
+
+      return Sanction.fromMap(
+        sanctionsExistantes.docs.first.data() as Map<String, dynamic>,
+      );
+    }
+
+    // Crée une nouvelle sanction
+    final sanction = Sanction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      tontineId: tontine.id,
+      tontineNom: tontine.nom,
+      membreId: membre.id,
+      membreNom: membre.nom,
+      montantInitial: tontine.montant,
+      montantDu: montantDu,
+      nombreFrequencesRetard: nombreFrequences,
+      dateEcheance: dateEcheance,
+      dateSanction: DateTime.now(),
+      estPayee: false,
+    );
+
+    await creerSanction(sanction);
+
+    // Notification
+    await creerNotification(
+      NotificationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        titre: '⚠️ Sanction de retard',
+        message:
+            '${membre.nom} doit payer ${Formatage.montant(montantDu)} au lieu de ${Formatage.montant(tontine.montant)} pour $nombreFrequences fréquence(s) de retard dans "${tontine.nom}"',
+        date: DateTime.now(),
+        type: TypeNotification.retardContribution,
+      ),
+    );
+
+    return sanction;
+  }
+
+  // Récupère la sanction active d'un membre
+  Future<Sanction?> getSanctionActive(String tontineId, String membreId) async {
+    final snapshot = await _sanctions
+        .where('tontineId', isEqualTo: tontineId)
+        .where('membreId', isEqualTo: membreId)
+        .where('estPayee', isEqualTo: false)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    return Sanction.fromMap(snapshot.docs.first.data() as Map<String, dynamic>);
+  }
+
+  // Envoie un rappel avant l'échéance
+  Future<void> envoyerRappelEcheance({
+    required Tontine tontine,
+    required Membre membre,
+  }) async {
+    if (!tontine.sanctionsActives) return;
+
+    await creerNotification(
+      NotificationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        titre: '⏰ Rappel de cotisation',
+        message:
+            '${membre.nom}, n\'oubliez pas de payer ${Formatage.montant(tontine.montant)} pour "${tontine.nom}". En cas de retard, une pénalité de 10% sera appliquée !',
+        date: DateTime.now(),
+        type: TypeNotification.retardContribution,
+      ),
+    );
+  }
+
+  // Supprimer une sanction
+  Future<void> supprimerSanction(String sanctionId) async {
+    await _sanctions.doc(sanctionId).delete();
   }
 }
