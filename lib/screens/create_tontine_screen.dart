@@ -141,7 +141,13 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
         prevuesObligatoires: _prevuesObligatoires,
         membresVoientHistorique: _membresVoientHistorique,
         gestionnaire: 'Moi',
-        membres: [],
+        membres: [
+          Membre(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            nom: 'Moi',
+            aPaye: false,
+          ),
+        ],
         codeInvitation: code,
         tours: [],
       );
