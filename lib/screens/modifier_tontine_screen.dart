@@ -240,6 +240,10 @@ class _ModifierTontineScreenState extends State<ModifierTontineScreen> {
                           isExpanded: true,
                           items: const [
                             DropdownMenuItem(
+                              value: 'jour',
+                              child: Text('Chaque jour'),
+                            ),
+                            DropdownMenuItem(
                               value: 'semaine',
                               child: Text('Chaque semaine'),
                             ),
