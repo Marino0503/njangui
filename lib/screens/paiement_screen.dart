@@ -92,8 +92,6 @@ class _PaiementScreenState extends State<PaiementScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 2));
-
       // Met à jour le statut du membre
       final membresMAJ = widget.tontine.membres.map((m) {
         if (m.id == widget.membre.id) {
@@ -146,17 +144,20 @@ class _PaiementScreenState extends State<PaiementScreen> {
         ),
       );
 
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _etape = 4;
-      });
+      // ── Supprime le délai artificiel et passe directement à l'étape 4 ──
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _etape = 4;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

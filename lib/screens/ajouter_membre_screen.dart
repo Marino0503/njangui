@@ -25,7 +25,6 @@ class _AjouterMembreScreenState extends State<AjouterMembreScreen> {
   }
 
   Future<void> _ajouterMembre() async {
-    // ── Validations ──
     if (_nomController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -56,7 +55,6 @@ class _AjouterMembreScreenState extends State<AjouterMembreScreen> {
       return;
     }
 
-    // Vérifie si la tontine est pleine
     if (widget.tontine.membres.length >= widget.tontine.nombreMembres) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -69,7 +67,6 @@ class _AjouterMembreScreenState extends State<AjouterMembreScreen> {
       return;
     }
 
-    // Vérifie si le membre existe déjà
     final nomExiste = widget.tontine.membres.any(
       (m) => m.nom.toLowerCase() == _nomController.text.trim().toLowerCase(),
     );
@@ -87,23 +84,19 @@ class _AjouterMembreScreenState extends State<AjouterMembreScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Crée le nouveau membre
       final nouveauMembre = Membre(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         nom: _nomController.text.trim(),
         aPaye: false,
       );
 
-      // Ajoute à la liste existante
       final membresMAJ = [...widget.tontine.membres, nouveauMembre];
 
-      // Met à jour dans Firestore
       await FirestoreService().mettreAJourMembres(
         widget.tontine.id,
         membresMAJ,
       );
 
-      // Crée une notification
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -115,23 +108,24 @@ class _AjouterMembreScreenState extends State<AjouterMembreScreen> {
         ),
       );
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${nouveauMembre.nom} ajouté avec succès !'),
-          backgroundColor: const Color(0xFF2E9E6E),
-        ),
-      );
-
-      Navigator.pop(context);
+      // ── Pas de !mounted, on utilise mounted directement ──
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${nouveauMembre.nom} ajouté avec succès !'),
+            backgroundColor: const Color(0xFF2E9E6E),
+          ),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
