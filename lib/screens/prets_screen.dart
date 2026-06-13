@@ -369,10 +369,17 @@ class PretsScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () async {
                         await FirestoreService().accepterPret(pret.id);
+
+                        final membreConcerne = tontine.membres.firstWhere(
+                          (m) => m.id == pret.membreId,
+                          orElse: () => Membre(id: '', nom: '', aPaye: false),
+                        );
+
                         await FirestoreService().creerNotification(
                           NotificationModel(
                             id: DateTime.now().millisecondsSinceEpoch
                                 .toString(),
+                            userId: membreConcerne.userId ?? '', // ← AJOUTÉ
                             titre: provider.langue == 'fr'
                                 ? 'Prêt accepté'
                                 : 'Loan accepted',
@@ -413,10 +420,17 @@ class PretsScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () async {
                         await FirestoreService().refuserPret(pret.id);
+
+                        final membreConcerne = tontine.membres.firstWhere(
+                          (m) => m.id == pret.membreId,
+                          orElse: () => Membre(id: '', nom: '', aPaye: false),
+                        );
+
                         await FirestoreService().creerNotification(
                           NotificationModel(
                             id: DateTime.now().millisecondsSinceEpoch
                                 .toString(),
+                            userId: membreConcerne.userId ?? '', // ← AJOUTÉ
                             titre: provider.langue == 'fr'
                                 ? 'Prêt refusé'
                                 : 'Loan refused',

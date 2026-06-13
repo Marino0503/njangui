@@ -1,10 +1,45 @@
 // Modèle pour un membre
+enum StatutMembre {
+  actif,
+  enAttenteValidationGestionnaire, // Jean a demandé, Marino valide
+  enAttenteValidationMembre, // Marino invite, Jean valide
+  refuse,
+}
+
 class Membre {
   final String id;
   final String nom;
   final bool aPaye;
+  final String? userId;
+  final StatutMembre statut;
 
-  Membre({required this.id, required this.nom, required this.aPaye});
+  Membre({
+    required this.id,
+    required this.nom,
+    required this.aPaye,
+    this.userId,
+    this.statut = StatutMembre.actif,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nom': nom,
+      'aPaye': aPaye,
+      'userId': userId,
+      'statut': statut.index,
+    };
+  }
+
+  factory Membre.fromMap(Map<String, dynamic> data) {
+    return Membre(
+      id: data['id'],
+      nom: data['nom'],
+      aPaye: data['aPaye'],
+      userId: data['userId'],
+      statut: StatutMembre.values[data['statut'] ?? 0],
+    );
+  }
 }
 
 class Tontine {
@@ -30,6 +65,7 @@ class Tontine {
   final List<Tour> tours;
   final double penaliteParJour;
   final bool sanctionsActives;
+  final String gestionnaireId;
 
   Tontine({
     required this.id,
@@ -49,6 +85,7 @@ class Tontine {
     required this.membres,
     required this.codeInvitation,
     required this.tours,
+    required this.gestionnaireId,
     this.penaliteParJour = 500,
     this.sanctionsActives = false,
     this.totalCollecte = 0,
@@ -82,22 +119,21 @@ class Tontine {
       'membresVoientHistorique': membresVoientHistorique,
       'gestionnaire': gestionnaire,
       'codeInvitation': codeInvitation,
-      'membres': membres
-          .map((m) => {'id': m.id, 'nom': m.nom, 'aPaye': m.aPaye})
-          .toList(),
+      'membres': membres.map((m) => m.toMap()).toList(),
       'tours': tours.map((t) => t.toMap()).toList(),
       'totalCollecte': totalCollecte,
       'totalDistribue': totalDistribue,
       'soldeDisponible': soldeDisponible,
       'penaliteParJour': penaliteParJour,
       'sanctionsActives': sanctionsActives,
+      'gestionnaireId': gestionnaireId,
     };
   }
 
   factory Tontine.fromMap(Map<String, dynamic> data) {
     final membresData = data['membres'] as List<dynamic>? ?? [];
     final membres = membresData.map((m) {
-      return Membre(id: m['id'], nom: m['nom'], aPaye: m['aPaye']);
+      return Membre.fromMap(m as Map<String, dynamic>);
     }).toList();
 
     final toursData = data['tours'] as List<dynamic>? ?? [];
@@ -128,6 +164,7 @@ class Tontine {
       soldeDisponible: (data['soldeDisponible'] as num? ?? 0).toDouble(),
       penaliteParJour: (data['penaliteParJour'] as num? ?? 500).toDouble(),
       sanctionsActives: data['sanctionsActives'] ?? false,
+      gestionnaireId: data['gestionnaireId'] ?? '',
     );
   }
 }

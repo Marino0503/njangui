@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../models/tontine.dart';
-import '../models/notification_model.dart';
 
 class RejoindreTonitneScreen extends StatefulWidget {
   const RejoindreTonitneScreen({super.key});
@@ -53,37 +53,47 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
     }
   }
 
-  // Rejoindre la tontine
+  // Envoie une demande d'adhésion
   Future<void> _rejoindre() async {
     if (_tontineTrouvee == null) return;
+
+    final monUid = UserService().uidActuel;
+    if (monUid == null) return;
+
+    // Vérifie si la tontine est pleine
+    if (_tontineTrouvee!.membres.length >= _tontineTrouvee!.nombreMembres) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cette tontine est complète.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Vérifie si je suis déjà membre ou en attente
+    final dejaPresent = _tontineTrouvee!.membres.any((m) => m.userId == monUid);
+    if (dejaPresent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vous êtes déjà membre ou en attente pour cette tontine.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isJoining = true);
 
     try {
-      // Ajoute le nouveau membre
-      final nouveauMembre = Membre(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        nom: 'Moi',
-        aPaye: false,
-      );
+      final monNom = await UserService().getNomActuel();
 
-      final membresMAJ = [..._tontineTrouvee!.membres, nouveauMembre];
-
-      // Met à jour les membres dans Firestore
-      await FirestoreService().mettreAJourMembres(
-        _tontineTrouvee!.id,
-        membresMAJ,
-      );
-
-      // Crée une notification dans Firestore
-      await FirestoreService().creerNotification(
-        NotificationModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          titre: 'Nouveau membre',
-          message: 'Vous avez rejoint "${_tontineTrouvee!.nom}"',
-          date: DateTime.now(),
-          type: TypeNotification.nouveauMembre,
-        ),
+      await FirestoreService().demanderAdhesion(
+        tontine: _tontineTrouvee!,
+        userId: monUid,
+        userNom: monNom,
       );
 
       if (!mounted) return;
@@ -92,7 +102,9 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Vous avez rejoint "${_tontineTrouvee!.nom}" !'),
+          content: Text(
+            'Demande envoyée ! ${_tontineTrouvee!.gestionnaire} doit valider votre adhésion à "${_tontineTrouvee!.nom}".',
+          ),
           backgroundColor: const Color(0xFF2E9E6E),
         ),
       );
@@ -288,7 +300,7 @@ class _RejoindreTontineScreenState extends State<RejoindreTonitneScreen> {
                                   color: Colors.white,
                                 )
                               : const Text(
-                                  'Rejoindre cette tontine',
+                                  'Envoyer une demande d\'adhésion',
                                   style: TextStyle(fontSize: 16),
                                 ),
                         ),

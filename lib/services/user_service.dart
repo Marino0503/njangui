@@ -76,4 +76,41 @@ class UserService {
 
     await _users.doc(uid).update({'photoBase64': base64Photo});
   }
+
+  // Recherche un utilisateur par numéro de téléphone
+  Future<Map<String, dynamic>?> rechercherParTelephone(String telephone) async {
+    String numero = telephone.replaceAll(' ', '');
+
+    if (!numero.startsWith('+')) {
+      numero = '+237$numero';
+    }
+
+    final snapshot = await _db
+        .collection('users')
+        .where('telephone', isEqualTo: numero)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    final data = snapshot.docs.first.data();
+    return {
+      'uid': snapshot.docs.first.id,
+      'nom': data['nom'],
+      'telephone': data['telephone'],
+    };
+  }
+
+  // Récupère l'UID de l'utilisateur connecté
+  String? get uidActuel => _auth.currentUser?.uid;
+
+  // Récupère le nom de l'utilisateur connecté
+  Future<String> getNomActuel() async {
+    final uid = uidActuel;
+    if (uid == null) return 'Utilisateur';
+
+    final doc = await _db.collection('users').doc(uid).get();
+    final data = doc.data();
+    return data?['nom'] ?? 'Utilisateur';
+  }
 }

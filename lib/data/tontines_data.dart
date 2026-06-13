@@ -28,6 +28,7 @@ class TontinesData {
         Membre(id: '3', nom: 'Josiane', aPaye: true),
       ],
       tours: [],
+      gestionnaireId: '',
     ),
     Tontine(
       id: '2',
@@ -50,6 +51,7 @@ class TontinesData {
         Membre(id: '2', nom: 'Sophie', aPaye: false),
       ],
       tours: [],
+      gestionnaireId: '',
     ),
   ];
 

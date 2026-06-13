@@ -20,13 +20,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
- final List<Widget> _pages = [
-  const HomeScreen(),
-  const TontinesScreen(),
-  const NotificationScreen(),
-  const StatistiquesScreen(),
-  const ProfilScreen(),
-];
+  final List<Widget> _pages = [
+    const HomeScreen(),
+    const TontinesScreen(),
+    const NotificationScreen(),
+    const StatistiquesScreen(),
+    const ProfilScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {

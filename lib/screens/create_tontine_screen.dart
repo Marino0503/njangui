@@ -6,6 +6,7 @@ import '../models/notification_model.dart';
 import '../services/firestore_service.dart';
 import '../utils/formatage.dart';
 import '../services/notification_service.dart';
+import '../services/user_service.dart';
 
 class CreateTontineScreen extends StatefulWidget {
   const CreateTontineScreen({super.key});
@@ -125,6 +126,8 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final monUid = UserService().uidActuel ?? '';
+      final monNom = await UserService().getNomActuel();
       final code =
           'TN${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
@@ -142,14 +145,17 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
         paiementsEnregistres: _paiementsEnregistres,
         prevuesObligatoires: _prevuesObligatoires,
         membresVoientHistorique: _membresVoientHistorique,
-        gestionnaire: 'Moi',
+        gestionnaire: monNom,
         membres: [
           Membre(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
-            nom: 'Moi',
+            nom: monNom,
             aPaye: false,
+            userId: monUid,
+            statut: StatutMembre.actif,
           ),
         ],
+        gestionnaireId: monUid,
         codeInvitation: code,
         tours: [],
         penaliteParJour: _penaliteParJour,
@@ -171,6 +177,7 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: monUid,
           titre: textes['nouvelleTontineCreee']!,
           message: provider.langue == 'fr'
               ? 'Vous avez créé la tontine "${nouvelleTontine.nom}"'

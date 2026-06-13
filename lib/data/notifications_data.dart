@@ -39,6 +39,7 @@ class NotificationsData {
     ajouterNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
         titre: 'Nouvelle tontine créée',
         message: 'Vous avez créé la tontine "$nomTontine"',
         date: DateTime.now(),
@@ -52,6 +53,7 @@ class NotificationsData {
     ajouterNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
         titre: 'Nouveau membre',
         message: '$nomMembre a rejoint la tontine "$nomTontine"',
         date: DateTime.now(),
@@ -65,6 +67,7 @@ class NotificationsData {
     ajouterNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
         titre: 'Retard de contribution',
         message: '$nomMembre est en retard dans la tontine "$nomTontine"',
         date: DateTime.now(),
@@ -82,6 +85,7 @@ class NotificationsData {
     ajouterNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
         titre: 'Nouveau dépôt',
         message:
             '$nomMembre a payé ${montant.toStringAsFixed(0)} FCFA dans "$nomTontine"',

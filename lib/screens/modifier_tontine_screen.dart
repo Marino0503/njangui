@@ -116,6 +116,7 @@ class _ModifierTontineScreenState extends State<ModifierTontineScreen> {
         membres: widget.tontine.membres,
         codeInvitation: widget.tontine.codeInvitation,
         tours: [],
+        gestionnaireId: widget.tontine.gestionnaireId,
       );
 
       // Sauvegarde dans Firestore

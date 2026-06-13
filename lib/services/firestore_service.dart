@@ -5,6 +5,8 @@ import '../models/paiement.dart';
 import '../models/pret.dart';
 import '../models/sanction.dart';
 import '../utils/formatage.dart';
+import '../models/demande_adhesion.dart';
+import 'user_service.dart';
 
 class FirestoreService {
   // Singleton
@@ -41,9 +43,8 @@ class FirestoreService {
       'membresVoientHistorique': tontine.membresVoientHistorique,
       'gestionnaire': tontine.gestionnaire,
       'codeInvitation': tontine.codeInvitation,
-      'membres': tontine.membres
-          .map((m) => {'id': m.id, 'nom': m.nom, 'aPaye': m.aPaye})
-          .toList(),
+      'membres': tontine.membres.map((m) => m.toMap()).toList(),
+      'gestionnaireId': tontine.gestionnaireId,
       'tours': tontine.tours.map((t) => t.toMap()).toList(),
       'createdAt': FieldValue.serverTimestamp(),
       'totalCollecte': 0,
@@ -55,26 +56,51 @@ class FirestoreService {
   }
 
   // Récupérer toutes les tontines en temps réel
-  Stream<List<Tontine>> getTontines() {
-    return _tontines.orderBy('createdAt', descending: true).snapshots().map((
+  // Mes tontines (celles que je gère)
+  Stream<List<Tontine>> getMesTontines() {
+    final uid = UserService().uidActuel;
+    if (uid == null) return Stream.value([]);
+
+    return _tontines.where('gestionnaireId', isEqualTo: uid).snapshots().map((
       snapshot,
     ) {
       return snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return _tontineFromMap(data);
-      }).toList();
+      }).toList()..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
+    });
+  }
+
+  // Tontines que j'ai rejointes (je suis membre actif, pas gestionnaire)
+  Stream<List<Tontine>> getTontinesRejointes() {
+    final uid = UserService().uidActuel;
+    if (uid == null) return Stream.value([]);
+
+    return _tontines.snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return _tontineFromMap(data);
+          })
+          .where((t) {
+            if (t.gestionnaireId == uid) return false;
+            return t.membres.any(
+              (m) => m.userId == uid && m.statut == StatutMembre.actif,
+            );
+          })
+          .toList()
+        ..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
     });
   }
 
   // Mettre à jour les membres d'une tontine
+  // ✅ Nouveau
   Future<void> mettreAJourMembres(
     String tontineId,
     List<Membre> membres,
   ) async {
     await _tontines.doc(tontineId).update({
-      'membres': membres
-          .map((m) => {'id': m.id, 'nom': m.nom, 'aPaye': m.aPaye})
-          .toList(),
+      'membres': membres.map((m) => m.toMap()).toList(),
     });
   }
 
@@ -91,6 +117,25 @@ class FirestoreService {
     return _tontineFromMap(data);
   }
 
+  // Toutes les tontines où je suis impliqué (créées + rejointes)
+  Stream<List<Tontine>> getTontines() {
+    final uid = UserService().uidActuel;
+    if (uid == null) return Stream.value([]);
+
+    return _tontines.snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => _tontineFromMap(doc.data() as Map<String, dynamic>))
+          .where((t) {
+            if (t.gestionnaireId == uid) return true;
+            return t.membres.any(
+              (m) => m.userId == uid && m.statut == StatutMembre.actif,
+            );
+          })
+          .toList()
+        ..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
+    });
+  }
+
   // ════════════════════════════════════════
   //           NOTIFICATIONS
   // ════════════════════════════════════════
@@ -99,6 +144,7 @@ class FirestoreService {
   Future<void> creerNotification(NotificationModel notif) async {
     await _notifications.doc(notif.id).set({
       'id': notif.id,
+      'userId': notif.userId,
       'titre': notif.titre,
       'message': notif.message,
       'date': notif.date.toIso8601String(),
@@ -110,7 +156,11 @@ class FirestoreService {
 
   // Récupérer les notifications en temps réel
   Stream<List<NotificationModel>> getNotifications() {
+    final uid = UserService().uidActuel;
+    if (uid == null) return Stream.value([]);
+
     return _notifications
+        .where('userId', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -118,6 +168,7 @@ class FirestoreService {
             final data = doc.data() as Map<String, dynamic>;
             return NotificationModel(
               id: data['id'],
+              userId: data['userId'] ?? '',
               titre: data['titre'],
               message: data['message'],
               date: DateTime.parse(data['date']),
@@ -135,7 +186,13 @@ class FirestoreService {
 
   // Marquer toutes comme lues
   Future<void> marquerToutesCommeLues() async {
-    final snapshot = await _notifications.where('lu', isEqualTo: false).get();
+    final uid = UserService().uidActuel;
+    if (uid == null) return;
+
+    final snapshot = await _notifications
+        .where('userId', isEqualTo: uid)
+        .where('lu', isEqualTo: false)
+        .get();
 
     final batch = _db.batch();
     for (var doc in snapshot.docs) {
@@ -152,7 +209,7 @@ class FirestoreService {
   Tontine _tontineFromMap(Map<String, dynamic> data) {
     final membresData = data['membres'] as List<dynamic>? ?? [];
     final membres = membresData.map((m) {
-      return Membre(id: m['id'], nom: m['nom'], aPaye: m['aPaye']);
+      return Membre.fromMap(m as Map<String, dynamic>);
     }).toList();
 
     final toursData = data['tours'] as List<dynamic>? ?? [];
@@ -183,6 +240,7 @@ class FirestoreService {
       totalCollecte: (data['totalCollecte'] as num? ?? 0).toDouble(),
       totalDistribue: (data['totalDistribue'] as num? ?? 0).toDouble(),
       soldeDisponible: (data['soldeDisponible'] as num? ?? 0).toDouble(),
+      gestionnaireId: data['gestionnaireId'] ?? '',
     );
   }
 
@@ -723,6 +781,7 @@ class FirestoreService {
     await creerNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: membre.userId ?? '',
         titre: '⚠️ Sanction de retard',
         message:
             '${membre.nom} doit payer ${Formatage.montant(montantDu)} au lieu de ${Formatage.montant(tontine.montant)} pour $nombreFrequences fréquence(s) de retard dans "${tontine.nom}"',
@@ -757,6 +816,7 @@ class FirestoreService {
     await creerNotification(
       NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: membre.userId ?? '',
         titre: '⏰ Rappel de cotisation',
         message:
             '${membre.nom}, n\'oubliez pas de payer ${Formatage.montant(tontine.montant)} pour "${tontine.nom}". En cas de retard, une pénalité de 10% sera appliquée !',
@@ -769,5 +829,222 @@ class FirestoreService {
   // Supprimer une sanction
   Future<void> supprimerSanction(String sanctionId) async {
     await _sanctions.doc(sanctionId).delete();
+  }
+  // ════════════════════════════════════════
+  //        DEMANDES D'ADHÉSION
+  // ════════════════════════════════════════
+
+  CollectionReference get _demandes => _db.collection('demandes_adhesion');
+
+  // Créer une invitation (Marino invite Jean)
+  Future<void> envoyerInvitation({
+    required Tontine tontine,
+    required String userId,
+    required String userNom,
+    required String gestionnaireId,
+    required String gestionnaireNom,
+  }) async {
+    final demande = DemandeAdhesion(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      tontineId: tontine.id,
+      tontineNom: tontine.nom,
+      userId: userId,
+      userNom: userNom,
+      gestionnaireId: gestionnaireId,
+      gestionnaireNom: gestionnaireNom,
+      type: TypeDemande.invitation,
+      statut: StatutDemande.enAttente,
+      date: DateTime.now(),
+    );
+
+    await _demandes.doc(demande.id).set(demande.toMap());
+
+    // Ajoute le membre avec statut "en attente"
+    final nouveauMembre = Membre(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      nom: userNom,
+      aPaye: false,
+      userId: userId,
+      statut: StatutMembre.enAttenteValidationMembre,
+    );
+
+    final membresMAJ = [...tontine.membres, nouveauMembre];
+    await mettreAJourMembres(tontine.id, membresMAJ);
+
+    // Notification au membre invité
+    await creerNotification(
+      NotificationModel(
+        id: '${demande.id}_notif',
+        userId: userId,
+        titre: 'Invitation à une tontine',
+        message:
+            '$gestionnaireNom veut vous ajouter à "${tontine.nom}". Acceptez-vous ?',
+        date: DateTime.now(),
+        type: TypeNotification.nouveauMembre,
+      ),
+    );
+  }
+
+  // Créer une demande de rejoindre (Jean demande à Marino)
+  Future<void> demanderAdhesion({
+    required Tontine tontine,
+    required String userId,
+    required String userNom,
+  }) async {
+    final demande = DemandeAdhesion(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      tontineId: tontine.id,
+      tontineNom: tontine.nom,
+      userId: userId,
+      userNom: userNom,
+      gestionnaireId: tontine.gestionnaireId,
+      gestionnaireNom: tontine.gestionnaire,
+      type: TypeDemande.demandeRejoindre,
+      statut: StatutDemande.enAttente,
+      date: DateTime.now(),
+    );
+
+    await _demandes.doc(demande.id).set(demande.toMap());
+
+    // Ajoute le membre avec statut "en attente"
+    final nouveauMembre = Membre(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      nom: userNom,
+      aPaye: false,
+      userId: userId,
+      statut: StatutMembre.enAttenteValidationGestionnaire,
+    );
+
+    final membresMAJ = [...tontine.membres, nouveauMembre];
+    await mettreAJourMembres(tontine.id, membresMAJ);
+
+    // Notification au gestionnaire
+    await creerNotification(
+      NotificationModel(
+        id: '${demande.id}_notif',
+        userId: tontine.gestionnaireId,
+        titre: 'Demande d\'adhésion',
+        message: '$userNom veut rejoindre "${tontine.nom}"',
+        date: DateTime.now(),
+        type: TypeNotification.nouveauMembre,
+      ),
+    );
+  }
+
+  // Récupérer les demandes en attente pour un utilisateur
+  Stream<List<DemandeAdhesion>> getDemandesPourUtilisateur(String userId) {
+    return _demandes
+        .where('statut', isEqualTo: StatutDemande.enAttente.index)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map(
+                (doc) =>
+                    DemandeAdhesion.fromMap(doc.data() as Map<String, dynamic>),
+              )
+              .where((d) {
+                // Pour une invitation : le destinataire (userId) doit valider
+                // Pour une demande de rejoindre : le gestionnaire doit valider
+                if (d.type == TypeDemande.invitation) {
+                  return d.userId == userId;
+                } else {
+                  return d.gestionnaireId == userId;
+                }
+              })
+              .toList();
+        });
+  }
+
+  // Accepter une demande/invitation
+  Future<void> accepterDemande(DemandeAdhesion demande) async {
+    await _demandes.doc(demande.id).update({
+      'statut': StatutDemande.acceptee.index,
+    });
+
+    // Met à jour le statut du membre dans la tontine
+    final doc = await _tontines.doc(demande.tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+    final membresData = data['membres'] as List<dynamic>;
+
+    final membres = membresData.map((m) {
+      final membre = Membre.fromMap(m as Map<String, dynamic>);
+      if (membre.userId == demande.userId) {
+        return Membre(
+          id: membre.id,
+          nom: membre.nom,
+          aPaye: membre.aPaye,
+          userId: membre.userId,
+          statut: StatutMembre.actif,
+        );
+      }
+      return membre;
+    }).toList();
+
+    await _tontines.doc(demande.tontineId).update({
+      'membres': membres.map((m) => m.toMap()).toList(),
+    });
+
+    // Notification à l'autre partie
+    final destinataireId = demande.type == TypeDemande.invitation
+        ? demande.gestionnaireId
+        : demande.userId;
+    final messageTexte = demande.type == TypeDemande.invitation
+        ? '${demande.userNom} a accepté votre invitation pour "${demande.tontineNom}"'
+        : 'Vous avez été accepté(e) dans "${demande.tontineNom}"';
+
+    await creerNotification(
+      NotificationModel(
+        id: '${demande.id}_accept_notif',
+        userId: destinataireId,
+        titre: 'Demande acceptée',
+        message: messageTexte,
+        date: DateTime.now(),
+        type: TypeNotification.nouveauMembre,
+      ),
+    );
+
+    // Identifiant non utilisé directement mais conservé pour clarté
+    // destinataireId pourrait servir pour des notifs ciblées plus tard
+    assert(destinataireId.isNotEmpty);
+  }
+
+  // Refuser une demande/invitation
+  Future<void> refuserDemande(DemandeAdhesion demande) async {
+    await _demandes.doc(demande.id).update({
+      'statut': StatutDemande.refusee.index,
+    });
+
+    // Retire le membre de la tontine
+    final doc = await _tontines.doc(demande.tontineId).get();
+    final data = doc.data() as Map<String, dynamic>;
+    final membresData = data['membres'] as List<dynamic>;
+
+    final membres = membresData
+        .map((m) => Membre.fromMap(m as Map<String, dynamic>))
+        .where((m) => m.userId != demande.userId)
+        .toList();
+
+    await _tontines.doc(demande.tontineId).update({
+      'membres': membres.map((m) => m.toMap()).toList(),
+    });
+
+    // Notification
+    final destinataireId = demande.type == TypeDemande.invitation
+        ? demande.gestionnaireId
+        : demande.userId;
+    final messageTexte = demande.type == TypeDemande.invitation
+        ? '${demande.userNom} a refusé votre invitation pour "${demande.tontineNom}"'
+        : 'Votre demande pour "${demande.tontineNom}" a été refusée';
+
+    await creerNotification(
+      NotificationModel(
+        id: '${demande.id}_refus_notif',
+        userId: destinataireId,
+        titre: 'Demande refusée',
+        message: messageTexte,
+        date: DateTime.now(),
+        type: TypeNotification.retardContribution,
+      ),
+    );
   }
 }

@@ -115,6 +115,7 @@ class _DemanderPretScreenState extends State<DemanderPretScreen> {
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: widget.tontine.gestionnaireId,
           titre: provider.langue == 'fr'
               ? 'Nouvelle demande de prêt'
               : 'New loan request',

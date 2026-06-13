@@ -16,6 +16,7 @@ import 'tours_screen.dart';
 import 'prets_screen.dart';
 import 'flux_financiers_screen.dart';
 import 'sanctions_screen.dart';
+import '../services/user_service.dart';
 
 class DetailTontineScreen extends StatelessWidget {
   final Tontine tontine;
@@ -44,7 +45,13 @@ class DetailTontineScreen extends StatelessWidget {
     try {
       final membresMAJ = tontine.membres.map((m) {
         if (m.id == membre.id) {
-          return Membre(id: m.id, nom: m.nom, aPaye: !m.aPaye);
+          return Membre(
+            id: m.id,
+            nom: m.nom,
+            aPaye: !m.aPaye,
+            userId: m.userId,
+            statut: m.statut,
+          );
         }
         return m;
       }).toList();
@@ -79,6 +86,7 @@ class DetailTontineScreen extends StatelessWidget {
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: tontine.gestionnaireId, // ← AJOUTÉ
           titre: !membre.aPaye ? 'Nouveau dépôt' : 'Retard de contribution',
           message: !membre.aPaye
               ? '${membre.nom} a payé ${Formatage.montant(tontine.montant)} dans "${tontine.nom}"'
@@ -137,6 +145,7 @@ class DetailTontineScreen extends StatelessWidget {
                 await FirestoreService().creerNotification(
                   NotificationModel(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    userId: membre.userId ?? '',
                     titre: textes['membreSupprime']!,
                     message:
                         '${membre.nom} ${provider.langue == 'fr' ? 'a été retiré de' : 'was removed from'} "${tontine.nom}"',
@@ -198,6 +207,7 @@ class DetailTontineScreen extends StatelessWidget {
                 await FirestoreService().creerNotification(
                   NotificationModel(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    userId: tontine.gestionnaireId, // ← AJOUTÉ
                     titre: provider.langue == 'fr'
                         ? 'Tontine supprimée'
                         : 'Tontine deleted',
@@ -528,47 +538,52 @@ class DetailTontineScreen extends StatelessWidget {
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              AjouterMembreScreen(
-                                                tontine: tontineActuelle,
-                                              ),
+                                  // Nouveau - seulement le gestionnaire voit le bouton
+                                  if (tontineActuelle.gestionnaireId ==
+                                      UserService().uidActuel)
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AjouterMembreScreen(
+                                                  tontine: tontineActuelle,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
                                         ),
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF2E9E6E),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.add,
-                                            color: Colors.white,
-                                            size: 16,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF2E9E6E),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            textes['ajouter']!,
-                                            style: const TextStyle(
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.add,
                                               color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
+                                              size: 16,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              textes['ajouter']!,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -840,9 +855,10 @@ class DetailTontineScreen extends StatelessWidget {
   Widget _buildMembreTile(Membre membre, BuildContext context) {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final textes = provider.textes;
+    final estMoi = membre.userId == UserService().uidActuel;
 
     return GestureDetector(
-      onTap: () => _changerStatutMembre(context, membre),
+      onTap: estMoi ? () => _changerStatutMembre(context, membre) : null,
       onLongPress: () => _confirmerSuppressionMembre(context, membre),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -909,7 +925,8 @@ class DetailTontineScreen extends StatelessWidget {
                       ),
                     ),
                   )
-                : GestureDetector(
+                : estMoi
+                ? GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
@@ -945,6 +962,24 @@ class DetailTontineScreen extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      provider.langue == 'fr' ? 'En attente' : 'Pending',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),

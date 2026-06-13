@@ -9,6 +9,7 @@ enum TypeNotification {
 
 class NotificationModel {
   final String id;
+  final String userId;
   final String titre;
   final String message;
   final DateTime date;
@@ -17,12 +18,37 @@ class NotificationModel {
 
   NotificationModel({
     required this.id,
+    required this.userId,
     required this.titre,
     required this.message,
     required this.date,
     required this.type,
     this.lu = false,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'userId': userId,
+      'titre': titre,
+      'message': message,
+      'date': date.toIso8601String(),
+      'type': type.index,
+      'lu': lu,
+    };
+  }
+
+  factory NotificationModel.fromMap(Map<String, dynamic> data) {
+    return NotificationModel(
+      id: data['id'],
+      userId: data['userId'] ?? '',
+      titre: data['titre'],
+      message: data['message'],
+      date: DateTime.parse(data['date']),
+      type: TypeNotification.values[data['type']],
+      lu: data['lu'] ?? false,
+    );
+  }
 
   // Icône selon le type
   static IconData iconPourType(TypeNotification type) {

@@ -93,9 +93,16 @@ class _PaiementScreenState extends State<PaiementScreen> {
 
     try {
       // Met à jour le statut du membre
+      // ✅ Nouveau
       final membresMAJ = widget.tontine.membres.map((m) {
         if (m.id == widget.membre.id) {
-          return Membre(id: m.id, nom: m.nom, aPaye: true);
+          return Membre(
+            id: m.id,
+            nom: m.nom,
+            aPaye: true,
+            userId: m.userId,
+            statut: m.statut,
+          );
         }
         return m;
       }).toList();
@@ -135,6 +142,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
       await FirestoreService().creerNotification(
         NotificationModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: widget.tontine.gestionnaireId, // ← AJOUTÉ
           titre: 'Paiement effectué',
           message: _sanctionActive != null
               ? '${widget.membre.nom} a payé ${Formatage.montant(_montantTotal)} (dont ${Formatage.montant(_sanctionActive!.montantDu)} de pénalité) via ${_modeSelectionne!.nom}'
