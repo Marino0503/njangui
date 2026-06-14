@@ -296,60 +296,62 @@ class DetailTontineScreen extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                PopupMenuButton<String>(
-                                  icon: const Icon(
-                                    Icons.more_vert,
-                                    color: Color(0xFF7B2D8B),
-                                  ),
-                                  onSelected: (value) async {
-                                    if (value == 'modifier') {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              ModifierTontineScreen(
-                                                tontine: tontineActuelle,
-                                              ),
-                                        ),
-                                      );
-                                    } else if (value == 'supprimer') {
-                                      _confirmerSuppression(context);
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'modifier',
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.edit,
-                                            color: Color(0xFF7B2D8B),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(textes['modifier']!),
-                                        ],
-                                      ),
+                                if (tontineActuelle.gestionnaireId ==
+                                    UserService().uidActuel)
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      color: Color(0xFF7B2D8B),
                                     ),
-                                    PopupMenuItem(
-                                      value: 'supprimer',
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
+                                    onSelected: (value) async {
+                                      if (value == 'modifier') {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                ModifierTontineScreen(
+                                                  tontine: tontineActuelle,
+                                                ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            textes['supprimer']!,
-                                            style: const TextStyle(
+                                        );
+                                      } else if (value == 'supprimer') {
+                                        _confirmerSuppression(context);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'modifier',
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.edit,
+                                              color: Color(0xFF7B2D8B),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(textes['modifier']!),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'supprimer',
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.delete,
                                               color: Colors.red,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              textes['supprimer']!,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
                               ],
                             ),
 

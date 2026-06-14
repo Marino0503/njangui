@@ -467,54 +467,107 @@ class _PaiementScreenState extends State<PaiementScreen> {
             // ── Modes de paiement ──
             ...ModePaiement.modes.map((mode) {
               final selectionne = _modeSelectionne?.type == mode.type;
+              final estBancaire = mode.type == TypePaiement.bancaire;
+
               return GestureDetector(
-                onTap: () {
-                  setState(() => _modeSelectionne = mode);
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: selectionne
-                        ? mode.couleur.withOpacity(0.1)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selectionne ? mode.couleur : Colors.grey.shade300,
-                      width: selectionne ? 2 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(mode.logo, style: const TextStyle(fontSize: 30)),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              mode.nom,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: selectionne
-                                    ? mode.couleur
-                                    : Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              mode.description,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
+                onTap: estBancaire
+                    ? null
+                    : () {
+                        // ← désactive le tap pour bancaire
+                        setState(() => _modeSelectionne = mode);
+                      },
+                child: Opacity(
+                  opacity: estBancaire ? 0.5 : 1.0, // ← grisé
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: selectionne
+                          ? mode.couleur.withOpacity(0.1)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selectionne
+                            ? mode.couleur
+                            : Colors.grey.shade300,
+                        width: selectionne ? 2 : 1,
                       ),
-                      if (selectionne)
-                        Icon(Icons.check_circle, color: mode.couleur),
-                    ],
+                    ),
+                    child: Row(
+                      children: [
+                        // ── Logo ──
+                        mode.image != null
+                            ? Image.asset(
+                                mode.image!,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.contain,
+                              )
+                            : Column(
+                                children: [
+                                  if (estBancaire)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'Bientôt',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 4),
+                                  const Icon(
+                                    Icons.account_balance,
+                                    size: 36,
+                                    color: Color(0xFF2E9E6E),
+                                  ),
+                                ],
+                              ),
+
+                        const SizedBox(width: 16),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                mode.nom,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: selectionne
+                                      ? mode.couleur
+                                      : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                estBancaire
+                                    ? (provider.langue == 'fr'
+                                          ? 'En attente — disponible prochainement'
+                                          : 'Pending — coming soon')
+                                    : mode.description,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (selectionne)
+                          Icon(Icons.check_circle, color: mode.couleur),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -541,10 +594,17 @@ class _PaiementScreenState extends State<PaiementScreen> {
             ),
             child: Row(
               children: [
-                Text(
-                  _modeSelectionne!.logo,
-                  style: const TextStyle(fontSize: 30),
-                ),
+                _modeSelectionne!.image != null
+                    ? Image.asset(
+                        _modeSelectionne!.image!,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.contain,
+                      )
+                    : Text(
+                        _modeSelectionne!.logo ?? '🏦',
+                        style: const TextStyle(fontSize: 30),
+                      ),
                 const SizedBox(width: 12),
                 Text(
                   _modeSelectionne!.nom,

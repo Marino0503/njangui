@@ -97,6 +97,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/njangi_logo.PNG
+    - assets/images/orange_money.PNG
+    - assets/images/mtn_money.PNG
 
   # To add assets to your application, add an assets section, like this:
   # assets:
