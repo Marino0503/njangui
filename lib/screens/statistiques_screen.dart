@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../models/tontine.dart';
 import '../models/paiement.dart';
 import '../utils/formatage.dart';
 import '../widgets/error_state.dart';
+import 'detail_tontine_screen.dart';
 
 class StatistiquesScreen extends StatelessWidget {
   const StatistiquesScreen({super.key});
@@ -24,7 +26,6 @@ class StatistiquesScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 20),
 
-                  // ── Titre ──
                   Text(
                     provider.langue == 'fr' ? 'Statistiques' : 'Statistics',
                     style: const TextStyle(
@@ -35,9 +36,9 @@ class StatistiquesScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // ── Stats globales ──
-                  StreamBuilder<Map<String, dynamic>>(
-                    stream: FirestoreService().getStats(),
+                  // ── Stats globales filtrées par utilisateur ──
+                  StreamBuilder<List<Tontine>>(
+                    stream: FirestoreService().getTontines(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -56,12 +57,30 @@ class StatistiquesScreen extends StatelessWidget {
                         );
                       }
 
-                      final stats = snapshot.data ?? {};
-                      final nombreTontines = stats['nombreTontines'] ?? 0;
-                      final nombreMembres = stats['nombreMembres'] ?? 0;
-                      final totalPaye = stats['totalPaye'] ?? 0.0;
-                      final nombrePaies = stats['nombrePaies'] ?? 0;
-                      final nombreRetards = stats['nombreRetards'] ?? 0;
+                      final tontines = snapshot.data ?? [];
+                      final monUid = UserService().uidActuel ?? '';
+
+                      // Total collecté uniquement pour mes tontines
+                      double totalCollecte = 0;
+                      for (final t in tontines) {
+                        totalCollecte += t.totalCollecte;
+                      }
+
+                      final nombreTontines = tontines.length;
+                      final nombreMembres = tontines.fold<int>(
+                        0,
+                        (sum, t) => sum + t.membres.length,
+                      );
+                      final nombrePayes = tontines.fold<int>(
+                        0,
+                        (sum, t) =>
+                            sum + t.membres.where((m) => m.aPaye).length,
+                      );
+                      final nombreRetards = tontines.fold<int>(
+                        0,
+                        (sum, t) =>
+                            sum + t.membres.where((m) => !m.aPaye).length,
+                      );
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,9 +111,7 @@ class StatistiquesScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  Formatage.montant(
-                                    (totalPaye as num).toDouble(),
-                                  ),
+                                  Formatage.montant(totalCollecte),
                                   style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.bold,
@@ -121,7 +138,7 @@ class StatistiquesScreen extends StatelessWidget {
                                       Icons.people_outline,
                                     ),
                                     _buildMiniStat(
-                                      '$nombrePaies',
+                                      '$nombrePayes',
                                       provider.langue == 'fr'
                                           ? 'Paiements'
                                           : 'Payments',
@@ -135,11 +152,11 @@ class StatistiquesScreen extends StatelessWidget {
 
                           const SizedBox(height: 24),
 
-                          // ── Taux de paiement ──
+                          // ── Taux de paiement global ──
                           Text(
                             provider.langue == 'fr'
-                                ? 'Taux de paiement'
-                                : 'Payment rate',
+                                ? 'Taux de paiement global'
+                                : 'Global payment rate',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -168,7 +185,7 @@ class StatistiquesScreen extends StatelessWidget {
                                       style: const TextStyle(fontSize: 15),
                                     ),
                                     Text(
-                                      '$nombrePaies',
+                                      '$nombrePayes',
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
@@ -181,14 +198,15 @@ class StatistiquesScreen extends StatelessWidget {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
                                   child: LinearProgressIndicator(
-                                    value: nombrePaies + nombreRetards > 0
-                                        ? nombrePaies /
-                                              (nombrePaies + nombreRetards)
+                                    value: nombrePayes + nombreRetards > 0
+                                        ? nombrePayes /
+                                              (nombrePayes + nombreRetards)
                                         : 0,
                                     backgroundColor: Colors.red.shade100,
-                                    valueColor: const AlwaysStoppedAnimation(
-                                      Color(0xFF2E9E6E),
-                                    ),
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF2E9E6E),
+                                        ),
                                     minHeight: 10,
                                   ),
                                 ),
@@ -219,11 +237,11 @@ class StatistiquesScreen extends StatelessWidget {
 
                           const SizedBox(height: 24),
 
-                          // ── Tontines récentes ──
+                          // ── Statistiques par tontine ──
                           Text(
                             provider.langue == 'fr'
-                                ? 'Tontines récentes'
-                                : 'Recent tontines',
+                                ? 'Statistiques par tontine'
+                                : 'Statistics per tontine',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -232,30 +250,24 @@ class StatistiquesScreen extends StatelessWidget {
 
                           const SizedBox(height: 12),
 
-                          StreamBuilder<List<Tontine>>(
-                            stream: FirestoreService().getTontines(),
-                            builder: (context, tontinesSnapshot) {
-                              final tontines = tontinesSnapshot.data ?? [];
-
-                              if (tontines.isEmpty) {
-                                return Center(
-                                  child: Text(
-                                    provider.langue == 'fr'
-                                        ? 'Aucune tontine'
-                                        : 'No tontine',
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
-                                );
-                              }
-
-                              return Column(
-                                children: tontines
-                                    .take(3)
-                                    .map((t) => _buildTontineStat(t, provider))
-                                    .toList(),
-                              );
-                            },
-                          ),
+                          if (tontines.isEmpty)
+                            Center(
+                              child: Text(
+                                provider.langue == 'fr'
+                                    ? 'Aucune tontine'
+                                    : 'No tontine',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          else
+                            ...tontines.map(
+                              (t) => _buildTontineStatCard(
+                                t,
+                                provider,
+                                context,
+                                monUid,
+                              ),
+                            ),
 
                           const SizedBox(height: 24),
 
@@ -277,7 +289,17 @@ class StatistiquesScreen extends StatelessWidget {
                             builder: (context, paiementsSnapshot) {
                               final paiements = paiementsSnapshot.data ?? [];
 
-                              if (paiements.isEmpty) {
+                              // Filtre les paiements liés à mes tontines
+                              final mesTontinesIds = tontines
+                                  .map((t) => t.id)
+                                  .toSet();
+                              final mesPaiements = paiements
+                                  .where(
+                                    (p) => mesTontinesIds.contains(p.tontineId),
+                                  )
+                                  .toList();
+
+                              if (mesPaiements.isEmpty) {
                                 return Center(
                                   child: Text(
                                     provider.langue == 'fr'
@@ -289,89 +311,12 @@ class StatistiquesScreen extends StatelessWidget {
                               }
 
                               return Column(
-                                children: paiements
+                                children: mesPaiements
                                     .take(5)
                                     .map((p) => _buildPaiementStat(p, provider))
                                     .toList(),
                               );
                             },
-                          ),
-
-                          // ── Prêts en cours ──
-                          Text(
-                            provider.langue == 'fr'
-                                ? 'Prêts en cours'
-                                : 'Active loans',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFFF8C00),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      provider.langue == 'fr'
-                                          ? 'Prêts actifs'
-                                          : 'Active loans',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${stats['nombrePretsEnCours'] ?? 0}',
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFFFF8C00),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      provider.langue == 'fr'
-                                          ? 'Total prêté'
-                                          : 'Total loaned',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    Text(
-                                      Formatage.montant(
-                                        ((stats['totalPrets'] ?? 0) as num)
-                                            .toDouble(),
-                                      ),
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFFFF8C00),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
                           ),
 
                           const SizedBox(height: 30),
@@ -409,55 +354,195 @@ class StatistiquesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTontineStat(Tontine tontine, AppProvider provider) {
+  // ── Carte statistiques par tontine ──
+  Widget _buildTontineStatCard(
+    Tontine tontine,
+    AppProvider provider,
+    BuildContext context,
+    String monUid,
+  ) {
     final membresPayes = tontine.membres.where((m) => m.aPaye).length;
     final totalMembres = tontine.membres.length;
     final progression = totalMembres > 0 ? membresPayes / totalMembres : 0.0;
+    final estGestionnaire = tontine.gestionnaireId == monUid;
 
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailTontineScreen(tontine: tontine),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── En-tête ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      tontine.nom,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: estGestionnaire
+                            ? const Color(0xFF7B2D8B).withOpacity(0.1)
+                            : const Color(0xFF2E9E6E).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        estGestionnaire
+                            ? (provider.langue == 'fr'
+                                  ? 'Gestionnaire'
+                                  : 'Manager')
+                            : (provider.langue == 'fr' ? 'Membre' : 'Member'),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: estGestionnaire
+                              ? const Color(0xFF7B2D8B)
+                              : const Color(0xFF2E9E6E),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Montant et fréquence ──
+            Text(
+              '${Formatage.montant(tontine.montant)}/${tontine.frequence}',
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Barre de progression ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  provider.langue == 'fr'
+                      ? '$membresPayes/$totalMembres membres ont payé'
+                      : '$membresPayes/$totalMembres members paid',
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                Text(
+                  '${(progression * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E9E6E),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 6),
+
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: progression,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  Color(0xFF2E9E6E),
+                ),
+                minHeight: 8,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Flux financiers ──
+            Row(
+              children: [
+                Expanded(
+                  child: _buildFluxItem(
+                    provider.langue == 'fr' ? 'Collecté' : 'Collected',
+                    Formatage.montant(tontine.totalCollecte),
+                    const Color(0xFF2E9E6E),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildFluxItem(
+                    provider.langue == 'fr' ? 'Distribué' : 'Distributed',
+                    Formatage.montant(tontine.totalDistribue),
+                    const Color(0xFF7B2D8B),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildFluxItem(
+                    provider.langue == 'fr' ? 'Solde' : 'Balance',
+                    Formatage.montant(tontine.soldeDisponible),
+                    const Color(0xFFFF8C00),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFluxItem(String label, String valeur, Color couleur) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
+        color: couleur.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                tontine.nom,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                provider.langue == 'fr'
-                    ? '$membresPayes/$totalMembres payés'
-                    : '$membresPayes/$totalMembres paid',
-                style: const TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progression,
-              backgroundColor: Colors.grey.shade300,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF2E9E6E),
-              ),
-              minHeight: 8,
-            ),
-          ),
-          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 10, color: couleur)),
+          const SizedBox(height: 2),
           Text(
-            '${Formatage.montant(tontine.montant)}/${tontine.frequence}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            valeur,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: couleur,
+            ),
           ),
         ],
       ),
