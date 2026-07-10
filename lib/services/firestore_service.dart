@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/tontine.dart';
 import '../models/notification_model.dart';
@@ -932,27 +933,56 @@ class FirestoreService {
   }
 
   // Récupérer les demandes en attente pour un utilisateur
+  // (invitations reçues + demandes à valider en tant que gestionnaire)
+  // Divisé en 2 sous-requêtes car les règles Firestore sécurisées
+  // exigent que chaque requête filtre explicitement par userId/gestionnaireId.
   Stream<List<DemandeAdhesion>> getDemandesPourUtilisateur(String userId) {
-    return _demandes
+    final controller = StreamController<List<DemandeAdhesion>>.broadcast();
+
+    List<DemandeAdhesion> invitationsRecues = [];
+    List<DemandeAdhesion> demandesAValider = [];
+
+    void emettre() {
+      if (controller.isClosed) return;
+      controller.add([...invitationsRecues, ...demandesAValider]);
+    }
+
+    final sub1 = _demandes
+        .where('type', isEqualTo: TypeDemande.invitation.index)
+        .where('userId', isEqualTo: userId)
         .where('statut', isEqualTo: StatutDemande.enAttente.index)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
+        .listen((snapshot) {
+          invitationsRecues = snapshot.docs
               .map(
                 (doc) =>
                     DemandeAdhesion.fromMap(doc.data() as Map<String, dynamic>),
               )
-              .where((d) {
-                // Pour une invitation : le destinataire (userId) doit valider
-                // Pour une demande de rejoindre : le gestionnaire doit valider
-                if (d.type == TypeDemande.invitation) {
-                  return d.userId == userId;
-                } else {
-                  return d.gestionnaireId == userId;
-                }
-              })
               .toList();
-        });
+          emettre();
+        }, onError: controller.addError);
+
+    final sub2 = _demandes
+        .where('type', isEqualTo: TypeDemande.demandeRejoindre.index)
+        .where('gestionnaireId', isEqualTo: userId)
+        .where('statut', isEqualTo: StatutDemande.enAttente.index)
+        .snapshots()
+        .listen((snapshot) {
+          demandesAValider = snapshot.docs
+              .map(
+                (doc) =>
+                    DemandeAdhesion.fromMap(doc.data() as Map<String, dynamic>),
+              )
+              .toList();
+          emettre();
+        }, onError: controller.addError);
+
+    controller.onCancel = () async {
+      await sub1.cancel();
+      await sub2.cancel();
+    };
+
+    return controller.stream;
   }
 
   // Accepter une demande/invitation
