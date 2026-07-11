@@ -858,10 +858,13 @@ class DetailTontineScreen extends StatelessWidget {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final textes = provider.textes;
     final estMoi = membre.userId == UserService().uidActuel;
+    final estGestionnaire = tontine.gestionnaireId == UserService().uidActuel;
 
     return GestureDetector(
       onTap: estMoi ? () => _changerStatutMembre(context, membre) : null,
-      onLongPress: () => _confirmerSuppressionMembre(context, membre),
+      onLongPress: estGestionnaire
+          ? () => _confirmerSuppressionMembre(context, membre)
+          : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

@@ -5,6 +5,7 @@ import '../models/tontine.dart';
 import '../models/notification_model.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../utils/formatage.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -14,6 +15,9 @@ class PretsScreen extends StatelessWidget {
   final Tontine tontine;
 
   const PretsScreen({super.key, required this.tontine});
+
+  bool get _estGestionnaire =>
+      tontine.gestionnaireId == UserService().uidActuel;
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +150,7 @@ class PretsScreen extends StatelessWidget {
                             context,
                             prets[index],
                             provider,
+                            _estGestionnaire,
                           );
                         },
                       );
@@ -160,7 +165,12 @@ class PretsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPretCard(BuildContext context, Pret pret, AppProvider provider) {
+  Widget _buildPretCard(
+    BuildContext context,
+    Pret pret,
+    AppProvider provider,
+    bool estGestionnaire,
+  ) {
     Color couleurStatut;
     String libelleStatut;
     IconData iconeStatut;
@@ -360,8 +370,8 @@ class PretsScreen extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
 
-            // ── Boutons accepter/refuser si en attente ──
-            if (pret.statut == StatutPret.enAttente) ...[
+            // ── Boutons accepter/refuser si en attente (gestionnaire uniquement) ──
+            if (pret.statut == StatutPret.enAttente && estGestionnaire) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -489,6 +499,9 @@ class DetailPretScreen extends StatelessWidget {
     required this.pret,
     required this.tontine,
   });
+
+  bool get _estGestionnaire =>
+      tontine.gestionnaireId == UserService().uidActuel;
 
   @override
   Widget build(BuildContext context) {
@@ -636,9 +649,10 @@ class DetailPretScreen extends StatelessWidget {
                     ),
                   ],
 
-                  // ── Bouton ajouter remboursement ──
-                  if (pret.statut == StatutPret.accepte ||
-                      pret.statut == StatutPret.enCours) ...[
+                  // ── Bouton ajouter remboursement (gestionnaire uniquement) ──
+                  if (_estGestionnaire &&
+                      (pret.statut == StatutPret.accepte ||
+                          pret.statut == StatutPret.enCours)) ...[
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,

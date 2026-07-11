@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/tontine.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../utils/formatage.dart';
 
 class ToursScreen extends StatelessWidget {
   final Tontine tontine;
 
   const ToursScreen({super.key, required this.tontine});
+
+  bool get _estGestionnaire =>
+      tontine.gestionnaireId == UserService().uidActuel;
 
   @override
   Widget build(BuildContext context) {
@@ -110,8 +114,8 @@ class ToursScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // ── Bouton générer les tours ──
-            if (tontine.tours.isEmpty)
+            // ── Bouton générer les tours (gestionnaire uniquement) ──
+            if (tontine.tours.isEmpty && _estGestionnaire)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: SizedBox(
@@ -185,7 +189,9 @@ class ToursScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            tontine.membres.isEmpty
+                            !_estGestionnaire
+                                ? 'Le gestionnaire doit générer les tours'
+                                : tontine.membres.isEmpty
                                 ? 'Ajoutez des membres d\'abord'
                                 : 'Appuyez sur le bouton pour générer',
                             style: const TextStyle(
@@ -201,7 +207,12 @@ class ToursScreen extends StatelessWidget {
                       itemCount: tontine.tours.length,
                       itemBuilder: (context, index) {
                         final tour = tontine.tours[index];
-                        return _buildTourTile(context, tour, tontine);
+                        return _buildTourTile(
+                          context,
+                          tour,
+                          tontine,
+                          _estGestionnaire,
+                        );
                       },
                     ),
             ),
@@ -211,7 +222,12 @@ class ToursScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTourTile(BuildContext context, Tour tour, Tontine tontine) {
+  Widget _buildTourTile(
+    BuildContext context,
+    Tour tour,
+    Tontine tontine,
+    bool estGestionnaire,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -281,6 +297,21 @@ class ToursScreen extends StatelessWidget {
                 child: const Text(
                   'Complété ✅',
                   style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              )
+            : !estGestionnaire
+            ? Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'En attente',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               )
             : GestureDetector(

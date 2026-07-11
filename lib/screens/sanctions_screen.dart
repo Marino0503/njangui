@@ -4,6 +4,7 @@ import '../models/tontine.dart';
 import '../models/sanction.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
+import '../services/user_service.dart';
 import '../utils/formatage.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -12,6 +13,9 @@ class SanctionsScreen extends StatelessWidget {
   final Tontine tontine;
 
   const SanctionsScreen({super.key, required this.tontine});
+
+  bool get _estGestionnaire =>
+      tontine.gestionnaireId == UserService().uidActuel;
 
   @override
   Widget build(BuildContext context) {
@@ -126,8 +130,8 @@ class SanctionsScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // ── Bouton appliquer sanction manuellement ──
-                if (tontine.sanctionsActives)
+                // ── Bouton appliquer sanction manuellement (gestionnaire uniquement) ──
+                if (tontine.sanctionsActives && _estGestionnaire)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: SizedBox(
@@ -217,6 +221,7 @@ class SanctionsScreen extends StatelessWidget {
                             context,
                             sanctions[index],
                             provider,
+                            _estGestionnaire,
                           );
                         },
                       );
@@ -421,6 +426,7 @@ class SanctionsScreen extends StatelessWidget {
     BuildContext context,
     Sanction sanction,
     AppProvider provider,
+    bool estGestionnaire,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -516,8 +522,8 @@ class SanctionsScreen extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
 
-          // ── Bouton marquer comme payée ──
-          if (!sanction.estPayee) ...[
+          // ── Bouton marquer comme payée (gestionnaire uniquement) ──
+          if (!sanction.estPayee && estGestionnaire) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
