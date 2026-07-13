@@ -1,0 +1,135 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════════
+// Règles de sécurité Firestore — Njangui
+//
+// Principe général : un utilisateur ne peut lire/écrire que les
+// données des tontines dont il est gestionnaire ou membre. Les
+// listes non filtrées (getMesTontines, getTontinesRejointes, ...)
+// sont bloquées : le code client DOIT filtrer via une requête
+// (where gestionnaireId==uid / where membresIds arrayContains uid)
+// pour que Firestore puisse valider la requête avant de l'exécuter.
+//
+// Exception pragmatique assumée : la lecture d'UNE tontine par son
+// ID exact (allow get) reste ouverte à tout utilisateur connecté,
+// pour permettre la recherche par code d'invitation et l'aperçu
+// avant adhésion. Cela n'autorise pas à lister/énumérer les
+// tontines des autres, seulement à lire un document dont on connaît
+// déjà l'identifiant (non énumérable).
+//
+// Limite connue : un membre peut légitimement modifier les champs
+// financiers de sa propre tontine (paiements, soldes) — les règles
+// ne peuvent pas valider qu'un montant écrit correspond à un vrai
+// paiement mobile money. Une intégration de paiement réelle
+// (Cloud Functions + webhook) est nécessaire pour fermer ce risque.
+// ════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estConnecte() {
+      return request.auth != null;
+    }
+
+    // Vérifie que l'utilisateur courant est gestionnaire ou membre
+    // de la tontine désignée par tontineId (utilisé par paiements,
+    // prêts et sanctions, qui sont rattachés à une tontine).
+    function estMembreOuGestionnaireDeTontine(tontineId) {
+      let t = get(/databases/$(database)/documents/tontines/$(tontineId)).data;
+      return estConnecte() &&
+        (t.gestionnaireId == request.auth.uid ||
+         request.auth.uid in t.get('membresIds', []));
+    }
+
+    // ───────── users ─────────
+    // Nécessaire pour la recherche d'un membre par numéro de téléphone
+    // (ajouter_membre_screen). Données peu sensibles (nom, téléphone).
+    match /users/{userId} {
+      allow read: if estConnecte();
+      allow write: if estConnecte() && request.auth.uid == userId;
+    }
+
+    // ───────── tontines ─────────
+    match /tontines/{tontineId} {
+      function estGestionnaire() {
+        return resource.data.gestionnaireId == request.auth.uid;
+      }
+
+      function estMembre() {
+        return request.auth.uid in resource.data.get('membresIds', []);
+      }
+
+      // Lecture d'un document précis : ouverte (voir note en tête de
+      // fichier). Le listing (getMesTontines/getTontinesRejointes)
+      // reste restreint ci-dessous.
+      allow get: if estConnecte();
+      allow list: if estConnecte() && (estGestionnaire() || estMembre());
+
+      allow create: if estConnecte() &&
+        request.resource.data.gestionnaireId == request.auth.uid;
+
+      allow update: if estConnecte() && (estGestionnaire() || estMembre());
+      allow delete: if estConnecte() && estGestionnaire();
+    }
+
+    // ───────── codes_invitation ─────────
+    // Mapping codeInvitation -> tontineId. Permet la recherche par code
+    // (trouverParCode) sans jamais lister la collection tontines.
+    match /codes_invitation/{code} {
+      allow get: if estConnecte();
+      allow list: if false;
+      allow create: if estConnecte();
+      allow update, delete: if false;
+    }
+
+    // ───────── notifications ─────────
+    match /notifications/{notifId} {
+      allow read: if estConnecte() && resource.data.userId == request.auth.uid;
+      // Une notification est souvent créée par une autre personne que
+      // son destinataire (ex : le gestionnaire notifie un membre).
+      allow create: if estConnecte();
+      allow update: if estConnecte() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ───────── paiements ─────────
+    match /paiements/{paiementId} {
+      allow get, list: if estMembreOuGestionnaireDeTontine(resource.data.tontineId);
+      allow create: if estMembreOuGestionnaireDeTontine(request.resource.data.tontineId);
+      allow update, delete: if false;
+    }
+
+    // ───────── prêts ─────────
+    match /prets/{pretId} {
+      allow get, list: if estMembreOuGestionnaireDeTontine(resource.data.tontineId);
+      allow create: if estMembreOuGestionnaireDeTontine(request.resource.data.tontineId);
+      allow update, delete: if estMembreOuGestionnaireDeTontine(resource.data.tontineId);
+    }
+
+    // ───────── sanctions ─────────
+    match /sanctions/{sanctionId} {
+      allow get, list: if estMembreOuGestionnaireDeTontine(resource.data.tontineId);
+      allow create: if estMembreOuGestionnaireDeTontine(request.resource.data.tontineId);
+      allow update, delete: if estMembreOuGestionnaireDeTontine(resource.data.tontineId);
+    }
+
+    // ───────── demandes d'adhésion ─────────
+    match /demandes_adhesion/{demandeId} {
+      allow get, list: if estConnecte() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.gestionnaireId == request.auth.uid);
+
+      allow create: if estConnecte() &&
+        (request.resource.data.userId == request.auth.uid ||
+         request.resource.data.gestionnaireId == request.auth.uid);
+
+      // type: 0 = demandeRejoindre (le gestionnaire valide),
+      //       1 = invitation (l'utilisateur invité valide)
+      allow update: if estConnecte() &&
+        ((resource.data.type == 0 && resource.data.gestionnaireId == request.auth.uid) ||
+         (resource.data.type == 1 && resource.data.userId == request.auth.uid));
+
+      allow delete: if false;
+    }
+  }
+}

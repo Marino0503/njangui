@@ -128,8 +128,7 @@ class _CreateTontineScreenState extends State<CreateTontineScreen> {
     try {
       final monUid = UserService().uidActuel ?? '';
       final monNom = await UserService().getNomActuel();
-      final code =
-          'TN${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final code = await FirestoreService().genererCodeUniqueTontine();
 
       final nouvelleTontine = Tontine(
         id: DateTime.now().millisecondsSinceEpoch.toString(),

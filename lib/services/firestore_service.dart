@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/tontine.dart';
 import '../models/notification_model.dart';
 import '../models/paiement.dart';
@@ -21,14 +22,39 @@ class FirestoreService {
   // ── Références des collections ──
   CollectionReference get _tontines => _db.collection('tontines');
   CollectionReference get _notifications => _db.collection('notifications');
+  // Mapping léger codeInvitation -> tontineId, lisible par tout utilisateur
+  // connecté (voir trouverParCode), pour permettre la recherche par code
+  // sans exposer l'intégralité de la collection tontines aux non-membres.
+  CollectionReference get _codesInvitation =>
+      _db.collection('codes_invitation');
 
-  // ════════════════════════════════════════
-  //           TONTINES
-  // ════════════════════════════════════════
+  // Liste à plat des userId des membres (toute statut confondu), utilisée
+  // pour les requêtes filtrées (where membresIds arrayContains uid) exigées
+  // par les règles Firestore, qui ne peuvent pas être vérifiées sur des
+  // requêtes non filtrées ni sur des champs imbriqués comme membres[].userId.
+  List<String> _membresIds(List<Membre> membres) {
+    return membres
+        .map((m) => m.userId)
+        .whereType<String>()
+        .toSet()
+        .toList();
+  }
+
+  // Génère un code d'invitation garanti unique (vérifié côté serveur)
+  Future<String> genererCodeUniqueTontine() async {
+    for (var tentative = 0; tentative < 5; tentative++) {
+      final code = Tontine.genererCode();
+      final existe = await _codesInvitation.doc(code).get();
+      if (!existe.exists) return code;
+    }
+    throw StateError('Impossible de générer un code d\'invitation unique.');
+  }
 
   // Créer une tontine
   Future<void> creerTontine(Tontine tontine) async {
-    await _tontines.doc(tontine.id).set({
+    final batch = _db.batch();
+
+    batch.set(_tontines.doc(tontine.id), {
       'id': tontine.id,
       'nom': tontine.nom,
       'montant': tontine.montant,
@@ -45,6 +71,7 @@ class FirestoreService {
       'gestionnaire': tontine.gestionnaire,
       'codeInvitation': tontine.codeInvitation,
       'membres': tontine.membres.map((m) => m.toMap()).toList(),
+      'membresIds': _membresIds(tontine.membres),
       'gestionnaireId': tontine.gestionnaireId,
       'tours': tontine.tours.map((t) => t.toMap()).toList(),
       'createdAt': FieldValue.serverTimestamp(),
@@ -54,6 +81,12 @@ class FirestoreService {
       'penaliteParJour': tontine.penaliteParJour,
       'sanctionsActives': tontine.sanctionsActives,
     });
+
+    batch.set(_codesInvitation.doc(tontine.codeInvitation), {
+      'tontineId': tontine.id,
+    });
+
+    await batch.commit();
   }
 
   // Récupérer toutes les tontines en temps réel
@@ -72,69 +105,109 @@ class FirestoreService {
     });
   }
 
+  // Tontines dont je suis membre (via le champ à plat membresIds, requis
+  // par les règles Firestore pour filtrer côté serveur)
+  Stream<List<Tontine>> _getTontinesOuJeSuisMembre() {
+    final uid = UserService().uidActuel;
+    if (uid == null) return Stream.value([]);
+
+    return _tontines
+        .where('membresIds', arrayContains: uid)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => _tontineFromMap(doc.data() as Map<String, dynamic>))
+              .toList();
+        });
+  }
+
   // Tontines que j'ai rejointes (je suis membre actif, pas gestionnaire)
   Stream<List<Tontine>> getTontinesRejointes() {
     final uid = UserService().uidActuel;
     if (uid == null) return Stream.value([]);
 
-    return _tontines.snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return _tontineFromMap(data);
-          })
-          .where((t) {
-            if (t.gestionnaireId == uid) return false;
-            return t.membres.any(
-              (m) => m.userId == uid && m.statut == StatutMembre.actif,
-            );
-          })
-          .toList()
-        ..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
+    return _getTontinesOuJeSuisMembre().map((tontines) {
+      return tontines.where((t) {
+        if (t.gestionnaireId == uid) return false;
+        return t.membres.any(
+          (m) => m.userId == uid && m.statut == StatutMembre.actif,
+        );
+      }).toList()..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
     });
   }
 
   // Mettre à jour les membres d'une tontine
-  // ✅ Nouveau
   Future<void> mettreAJourMembres(
     String tontineId,
     List<Membre> membres,
   ) async {
     await _tontines.doc(tontineId).update({
       'membres': membres.map((m) => m.toMap()).toList(),
+      'membresIds': _membresIds(membres),
     });
   }
 
-  // Chercher une tontine par code
+  // Chercher une tontine par code (passe par le mapping codes_invitation
+  // pour rester une simple lecture par identifiant, autorisée à tout
+  // utilisateur connecté même s'il n'est pas encore membre)
   Future<Tontine?> trouverParCode(String code) async {
-    final snapshot = await _tontines
-        .where('codeInvitation', isEqualTo: code.toUpperCase())
-        .limit(1)
-        .get();
+    final mapping = await _codesInvitation.doc(code.toUpperCase()).get();
+    if (!mapping.exists) return null;
 
-    if (snapshot.docs.isEmpty) return null;
+    final tontineId = (mapping.data() as Map<String, dynamic>)['tontineId'] as String?;
+    if (tontineId == null) return null;
 
-    final data = snapshot.docs.first.data() as Map<String, dynamic>;
-    return _tontineFromMap(data);
+    final doc = await _tontines.doc(tontineId).get();
+    if (!doc.exists) return null;
+
+    return _tontineFromMap(doc.data() as Map<String, dynamic>);
   }
 
-  // Toutes les tontines où je suis impliqué (créées + rejointes)
+  // Toutes les tontines où je suis impliqué (créées + rejointes), fusionnées
+  // à partir de deux requêtes filtrées séparément (voir getDemandesPourUtilisateur
+  // pour le même principe) car les règles Firestore exigent un filtre explicite
+  // par requête plutôt qu'un OR sur deux champs différents.
   Stream<List<Tontine>> getTontines() {
     final uid = UserService().uidActuel;
     if (uid == null) return Stream.value([]);
 
-    return _tontines.snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) => _tontineFromMap(doc.data() as Map<String, dynamic>))
-          .where((t) {
-            if (t.gestionnaireId == uid) return true;
-            return t.membres.any(
-              (m) => m.userId == uid && m.statut == StatutMembre.actif,
-            );
-          })
-          .toList()
-        ..sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
-    });
+    final controller = StreamController<List<Tontine>>.broadcast();
+    List<Tontine> gerees = [];
+    List<Tontine> rejointes = [];
+
+    void emettre() {
+      if (controller.isClosed) return;
+      final idsVus = <String>{};
+      final fusion = <Tontine>[];
+      for (final t in [...gerees, ...rejointes]) {
+        if (idsVus.add(t.id)) fusion.add(t);
+      }
+      fusion.sort((a, b) => b.dateDebut.compareTo(a.dateDebut));
+      controller.add(fusion);
+    }
+
+    final sub1 = getMesTontines().listen((data) {
+      gerees = data;
+      emettre();
+    }, onError: controller.addError);
+
+    final sub2 = _getTontinesOuJeSuisMembre().map((tontines) {
+      return tontines.where((t) {
+        return t.membres.any(
+          (m) => m.userId == uid && m.statut == StatutMembre.actif,
+        );
+      }).toList();
+    }).listen((data) {
+      rejointes = data;
+      emettre();
+    }, onError: controller.addError);
+
+    controller.onCancel = () async {
+      await sub1.cancel();
+      await sub2.cancel();
+    };
+
+    return controller.stream;
   }
 
   // ════════════════════════════════════════
@@ -286,9 +359,45 @@ class FirestoreService {
     });
   }
 
-  // Récupérer tous les paiements de l'utilisateur
-  Stream<List<Paiement>> getTousPaiements() {
-    return _paiements.snapshots().map((snapshot) {
+  // Initie un paiement mobile money réel (Orange Money / MTN Money) via
+  // Fapshi. Le montant est calculé côté serveur (Cloud Function), jamais
+  // fourni par le client. Retourne un lien de paiement à ouvrir (checkout
+  // hébergé par Fapshi) et l'id du document paiement à surveiller.
+  Future<({String link, String paiementId})> initierPaiementMobileMoney({
+    required String tontineId,
+    required String membreId,
+  }) async {
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'initierPaiement',
+    );
+    final resultat = await callable.call<Map<String, dynamic>>({
+      'tontineId': tontineId,
+      'membreId': membreId,
+    });
+    final data = Map<String, dynamic>.from(resultat.data as Map);
+    return (link: data['link'] as String, paiementId: data['paiementId'] as String);
+  }
+
+  // Suit en temps réel le statut d'un paiement initié via Fapshi
+  // ('en_attente' → 'paye' ou 'echec', mis à jour par le webhook serveur)
+  Stream<Paiement?> suivrePaiement(String paiementId) {
+    return _paiements.doc(paiementId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return Paiement.fromMap(doc.data() as Map<String, dynamic>);
+    });
+  }
+
+  // Récupérer les paiements des tontines données (utilisé pour les stats
+  // "mes paiements", scopé côté serveur au lieu de tout télécharger)
+  Stream<List<Paiement>> getPaiementsPourTontines(List<String> tontineIds) {
+    if (tontineIds.isEmpty) return Stream.value([]);
+
+    // Firestore limite whereIn à 30 valeurs.
+    final ids = tontineIds.take(30).toList();
+
+    return _paiements.where('tontineId', whereIn: ids).snapshots().map((
+      snapshot,
+    ) {
       return snapshot.docs.map((doc) {
         return Paiement.fromMap(doc.data() as Map<String, dynamic>);
       }).toList()..sort((a, b) => b.date.compareTo(a.date));
@@ -298,76 +407,16 @@ class FirestoreService {
   //           STATISTIQUES
   // ════════════════════════════════════════
 
-  // Récupère les stats globales
-  Stream<Map<String, dynamic>> getStats() {
-    return _tontines.snapshots().asyncMap((tontinesSnapshot) async {
-      final tontines = tontinesSnapshot.docs;
-
-      // Nombre total de tontines
-      final nombreTontines = tontines.length;
-
-      // Nombre total de membres
-      int nombreMembres = 0;
-      for (var doc in tontines) {
-        final data = doc.data() as Map<String, dynamic>;
-        final membres = data['membres'] as List<dynamic>? ?? [];
-        nombreMembres += membres.length;
-      }
-
-      // Paiements
-      final paiementsSnapshot = await _paiements.get();
-      final paiements = paiementsSnapshot.docs;
-
-      // Total payé
-      double totalPaye = 0;
-      int nombrePaies = 0;
-      int nombreRetards = 0;
-
-      for (var doc in paiements) {
-        final data = doc.data() as Map<String, dynamic>;
-        if (data['statut'] == 'paye') {
-          totalPaye += (data['montant'] as num).toDouble();
-          nombrePaies++;
-        } else {
-          nombreRetards++;
-        }
-      }
-
-      // Prêts
-      final pretsSnapshot = await _prets.get();
-      int nombrePretsEnCours = 0;
-      double totalPrets = 0;
-
-      for (var doc in pretsSnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        if (data['statut'] != StatutPret.rembourse.index &&
-            data['statut'] != StatutPret.refuse.index) {
-          nombrePretsEnCours++;
-          totalPrets += (data['montant'] as num).toDouble();
-        }
-      }
-
-      return {
-        'nombreTontines': nombreTontines,
-        'nombreMembres': nombreMembres,
-        'totalPaye': totalPaye,
-        'nombrePaies': nombrePaies,
-        'nombreRetards': nombreRetards,
-        'nombrePretsEnCours': nombrePretsEnCours,
-        'totalPrets': totalPrets,
-      };
-    });
-  }
-
   // Supprimer un membre d'une tontine
   Future<void> supprimerMembre(String tontineId, String membreId) async {
     final doc = await _tontines.doc(tontineId).get();
     final data = doc.data() as Map<String, dynamic>;
     final membres = (data['membres'] as List<dynamic>)
-        .where((m) => m['id'] != membreId)
+        .map((m) => Membre.fromMap(m as Map<String, dynamic>))
+        .where((m) => m.id != membreId)
         .toList();
 
-    await _tontines.doc(tontineId).update({'membres': membres});
+    await mettreAJourMembres(tontineId, membres);
   }
 
   // ════════════════════════════════════════
@@ -444,16 +493,6 @@ class FirestoreService {
     return _prets.where('tontineId', isEqualTo: tontineId).snapshots().map((
       snapshot,
     ) {
-      return snapshot.docs
-          .map((doc) => Pret.fromMap(doc.data() as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => b.dateDemande.compareTo(a.dateDemande));
-    });
-  }
-
-  // Récupérer tous les prêts
-  Stream<List<Pret>> getTousPrets() {
-    return _prets.snapshots().map((snapshot) {
       return snapshot.docs
           .map((doc) => Pret.fromMap(doc.data() as Map<String, dynamic>))
           .toList()
@@ -1010,9 +1049,7 @@ class FirestoreService {
       return membre;
     }).toList();
 
-    await _tontines.doc(demande.tontineId).update({
-      'membres': membres.map((m) => m.toMap()).toList(),
-    });
+    await mettreAJourMembres(demande.tontineId, membres);
 
     // Notification à l'autre partie
     final destinataireId = demande.type == TypeDemande.invitation
@@ -1054,9 +1091,7 @@ class FirestoreService {
         .where((m) => m.userId != demande.userId)
         .toList();
 
-    await _tontines.doc(demande.tontineId).update({
-      'membres': membres.map((m) => m.toMap()).toList(),
-    });
+    await mettreAJourMembres(demande.tontineId, membres);
 
     // Notification
     final destinataireId = demande.type == TypeDemande.invitation

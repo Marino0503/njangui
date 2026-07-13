@@ -1,3 +1,5 @@
+import 'dart:math';
+
 // Modèle pour un membre
 enum StatutMembre {
   actif,
@@ -95,11 +97,11 @@ class Tontine {
 
   static String genererCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = List.generate(
+    final random = Random.secure();
+    return List.generate(
       6,
-      (index) => chars[DateTime.now().microsecondsSinceEpoch % chars.length],
-    );
-    return random.join();
+      (_) => chars[random.nextInt(chars.length)],
+    ).join();
   }
 
   Map<String, dynamic> toMap() {

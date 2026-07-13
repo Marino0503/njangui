@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/mode_paiement.dart';
 import '../models/tontine.dart';
 import '../models/paiement.dart';
-import '../models/notification_model.dart';
 import '../models/sanction.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
@@ -30,6 +31,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
   int _etape = 1;
   Sanction? _sanctionActive;
   double _montantTotal = 0;
+  StreamSubscription<Paiement?>? _suiviPaiement;
 
   @override
   void initState() {
@@ -41,6 +43,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
   @override
   void dispose() {
     _numeroController.dispose();
+    _suiviPaiement?.cancel();
     super.dispose();
   }
 
@@ -87,78 +90,50 @@ class _PaiementScreenState extends State<PaiementScreen> {
     }
   }
 
-  // Confirme le paiement
+  // Initie un paiement mobile money réel via Fapshi et attend la
+  // confirmation du webhook serveur avant de considérer le paiement
+  // comme effectué (le montant est calculé côté serveur, jamais ici).
   Future<void> _confirmerPaiement() async {
     setState(() => _isLoading = true);
 
     try {
-      // Met à jour le statut du membre
-      // ✅ Nouveau
-      final membresMAJ = widget.tontine.membres.map((m) {
-        if (m.id == widget.membre.id) {
-          return Membre(
-            id: m.id,
-            nom: m.nom,
-            aPaye: true,
-            userId: m.userId,
-            statut: m.statut,
-          );
-        }
-        return m;
-      }).toList();
-
-      await FirestoreService().mettreAJourMembres(
-        widget.tontine.id,
-        membresMAJ,
-      );
-
-      // Enregistre le paiement avec le montant total
-      await FirestoreService().enregistrerPaiement(
-        Paiement(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          membreId: widget.membre.id,
-          membreNom: widget.membre.nom,
-          montant: _montantTotal,
-          date: DateTime.now(),
-          tontineId: widget.tontine.id,
-          tontineNom: widget.tontine.nom,
-          statut: 'paye',
-        ),
-      );
-
-      // Met à jour les flux financiers
-      await FirestoreService().mettreAJourFluxFinanciers(
+      final resultat = await FirestoreService().initierPaiementMobileMoney(
         tontineId: widget.tontine.id,
-        montantPaiement: _montantTotal,
-        typeFlux: 'paiement',
+        membreId: widget.membre.id,
       );
 
-      // Marque la sanction comme payée si elle existe
-      if (_sanctionActive != null) {
-        await FirestoreService().payerSanction(_sanctionActive!.id);
-      }
-
-      // Crée une notification
-      await FirestoreService().creerNotification(
-        NotificationModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          userId: widget.tontine.gestionnaireId, // ← AJOUTÉ
-          titre: 'Paiement effectué',
-          message: _sanctionActive != null
-              ? '${widget.membre.nom} a payé ${Formatage.montant(_montantTotal)} (dont ${Formatage.montant(_sanctionActive!.montantDu)} de pénalité) via ${_modeSelectionne!.nom}'
-              : '${widget.membre.nom} a payé ${Formatage.montant(_montantTotal)} via ${_modeSelectionne!.nom}',
-          date: DateTime.now(),
-          type: TypeNotification.nouveauDepot,
-        ),
+      final ouvert = await launchUrl(
+        Uri.parse(resultat.link),
+        mode: LaunchMode.externalApplication,
       );
-
-      // ── Supprime le délai artificiel et passe directement à l'étape 4 ──
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _etape = 4;
-        });
+      if (!ouvert) {
+        throw Exception('Impossible d\'ouvrir la page de paiement');
       }
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _etape = 4; // écran "en attente de confirmation"
+      });
+
+      _suiviPaiement = FirestoreService()
+          .suivrePaiement(resultat.paiementId)
+          .listen((paiement) {
+            if (!mounted || paiement == null) return;
+            if (paiement.statut == 'paye') {
+              setState(() => _etape = 5); // écran succès
+            } else if (paiement.statut == 'echec') {
+              setState(() => _etape = 1);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Le paiement a échoué ou a expiré. Veuillez réessayer.',
+                  ),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -214,6 +189,10 @@ class _PaiementScreenState extends State<PaiementScreen> {
                             ? provider.langue == 'fr'
                                   ? 'Confirmation'
                                   : 'Confirmation'
+                            : _etape == 4
+                            ? provider.langue == 'fr'
+                                  ? 'En attente'
+                                  : 'Pending'
                             : provider.langue == 'fr'
                             ? 'Paiement réussi'
                             : 'Payment successful',
@@ -301,7 +280,9 @@ class _PaiementScreenState extends State<PaiementScreen> {
                       ? _buildEtape2(provider)
                       : _etape == 3
                       ? _buildEtape3(provider)
-                      : _buildEtape4(provider),
+                      : _etape == 4
+                      ? _buildEtapeAttente(provider)
+                      : _buildEtape5(provider),
                 ),
 
                 // ── Bouton action ──
@@ -359,7 +340,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
                     ),
                   ),
 
-                if (_etape == 4)
+                if (_etape == 5)
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: SizedBox(
@@ -790,8 +771,42 @@ class _PaiementScreenState extends State<PaiementScreen> {
     );
   }
 
-  // ── Étape 4 : Succès ──
-  Widget _buildEtape4(AppProvider provider) {
+  // ── Étape 4 : en attente de confirmation du paiement (webhook Fapshi) ──
+  Widget _buildEtapeAttente(AppProvider provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF2E9E6E)),
+            const SizedBox(height: 24),
+            Text(
+              provider.langue == 'fr'
+                  ? 'En attente de confirmation...'
+                  : 'Waiting for confirmation...',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E9E6E),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              provider.langue == 'fr'
+                  ? 'Terminez le paiement ${_modeSelectionne!.nom} sur la page ouverte, puis revenez ici.'
+                  : 'Complete the ${_modeSelectionne!.nom} payment on the page that opened, then come back here.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Étape 5 : Succès (paiement confirmé par le webhook) ──
+  Widget _buildEtape5(AppProvider provider) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),

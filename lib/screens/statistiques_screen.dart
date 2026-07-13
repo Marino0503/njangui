@@ -285,19 +285,11 @@ class StatistiquesScreen extends StatelessWidget {
                           const SizedBox(height: 12),
 
                           StreamBuilder<List<Paiement>>(
-                            stream: FirestoreService().getTousPaiements(),
+                            stream: FirestoreService().getPaiementsPourTontines(
+                              tontines.map((t) => t.id).toList(),
+                            ),
                             builder: (context, paiementsSnapshot) {
-                              final paiements = paiementsSnapshot.data ?? [];
-
-                              // Filtre les paiements liés à mes tontines
-                              final mesTontinesIds = tontines
-                                  .map((t) => t.id)
-                                  .toSet();
-                              final mesPaiements = paiements
-                                  .where(
-                                    (p) => mesTontinesIds.contains(p.tontineId),
-                                  )
-                                  .toList();
+                              final mesPaiements = paiementsSnapshot.data ?? [];
 
                               if (mesPaiements.isEmpty) {
                                 return Center(
