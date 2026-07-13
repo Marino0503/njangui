@@ -6,8 +6,8 @@ class ChatbotService {
   factory ChatbotService() => _instance;
   ChatbotService._internal();
 
-  // Clé API Gemini
-  static const String _apiKey = 'AIzaSyACDWeoTh_7hq-XAW_QcDHA9PU-uS2BX7E';
+  // Clé API Gemini, fournie via --dart-define-from-file (voir dart_defines.example.json)
+  static const String _apiKey = String.fromEnvironment('GEMINI_API_KEY');
 
   // Modèle Gemini
   late final GenerativeModel _model;
@@ -15,6 +15,13 @@ class ChatbotService {
 
   // Initialise le chatbot
   void initialiser() {
+    if (_apiKey.isEmpty) {
+      throw StateError(
+        'GEMINI_API_KEY manquante. Lancez l\'app avec '
+        '--dart-define-from-file=dart_defines.json (voir dart_defines.example.json).',
+      );
+    }
+
     _model = GenerativeModel(
       model: 'gemini-2.5-flash',
       apiKey: _apiKey,
