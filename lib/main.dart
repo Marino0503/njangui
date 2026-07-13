@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/app_provider.dart';
-//import 'services/notification_service.dart';
+import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -25,12 +25,14 @@ void main() async {
   await AppProvider().initialiser();
 
   // Initialise les notifications de façon sécurisée
-  /*try {
+  try {
     await NotificationService().initialiser();
     await NotificationService().demanderPermission();
   } catch (e) {
-    print('Notifications non disponibles : $e');
-  }*/
+    if (kDebugMode) {
+      debugPrint('Notifications non disponibles : $e');
+    }
+  }
 
   runApp(
     ChangeNotifierProvider(create: (_) => AppProvider(), child: const MyApp()),

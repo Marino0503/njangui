@@ -1,39 +1,66 @@
-/*import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
+  // Singleton
+  static final NotificationService _instance =
+      NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
+  bool _initialise = false;
+
+  // Initialise le service (idempotent)
   Future<void> initialiser() async {
+    if (_initialise) return;
+
     tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Africa/Douala'));
 
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@drawable/ic_notification'),
-      iOS: DarwinInitializationSettings(),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+      linux: LinuxInitializationSettings(defaultActionName: 'Ouvrir'),
     );
 
     await _notifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse r) {},
     );
+
+    _initialise = true;
   }
 
+  // Demande les permissions nécessaires (Android 13+ et iOS)
   Future<void> demanderPermission() async {
-    // Permission gérée automatiquement
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.requestNotificationsPermission();
+    await android?.requestExactAlarmsPermission();
+
+    final ios = _notifications
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    await ios?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
+  // Affiche une notification immédiate
   Future<void> envoyerNotification({
     required int id,
     required String titre,
     required String message,
   }) async {
-    // ── Sans icône personnalisée ──
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'njangi_channel',
@@ -47,6 +74,7 @@ class NotificationService {
     await _notifications.show(id, titre, message, details);
   }
 
+  // Programme une notification à une date donnée
   Future<void> programmerRappel({
     required int id,
     required String titre,
@@ -63,18 +91,34 @@ class NotificationService {
       iOS: DarwinNotificationDetails(),
     );
 
-    await _notifications.zonedSchedule(
-      id,
-      titre,
-      message,
-      tz.TZDateTime.from(dateRappel, tz.local),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    try {
+      await _notifications.zonedSchedule(
+        id,
+        titre,
+        message,
+        tz.TZDateTime.from(dateRappel, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } on Exception {
+      // La permission d'alarme exacte peut être refusée par l'utilisateur :
+      // on retombe sur un mode non-exact plutôt que de planter l'appel.
+      await _notifications.zonedSchedule(
+        id,
+        titre,
+        message,
+        tz.TZDateTime.from(dateRappel, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    }
   }
 
+  // Programme les rappels de cotisation (veille + jour même) pour une tontine
   Future<void> programmerRappelsTontines({
     required String nomTontine,
     required double montant,
@@ -131,37 +175,4 @@ class NotificationService {
   Future<void> annulerTousLesRappels() async {
     await _notifications.cancelAll();
   }
-}*/
-
-class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
-
-  Future<void> initialiser() async {}
-
-  Future<void> demanderPermission() async {}
-
-  Future<void> envoyerNotification({
-    required int id,
-    required String titre,
-    required String message,
-  }) async {
-    // Les notifications sont gérées via Firestore
-    print('Notification : $titre - $message');
-  }
-
-  Future<void> programmerRappelsTontines({
-    required String nomTontine,
-    required double montant,
-    required DateTime dateEcheance,
-    required String langue,
-  }) async {
-    // Les rappels sont gérés via Firestore
-    print('Rappel programmé pour $nomTontine');
-  }
-
-  Future<void> annulerRappel(int id) async {}
-
-  Future<void> annulerTousLesRappels() async {}
 }
