@@ -210,4 +210,36 @@ class Tour {
       montantTotal: (data['montantTotal'] as num).toDouble(),
     );
   }
+
+  // Génère la liste des tours d'une tontine (ordre défini, ou aléatoire si
+  // ordreReception == 'aleatoire'). Logique pure, sans accès à Firestore.
+  static List<Tour> genererListe(Tontine tontine) {
+    final membres = tontine.membres;
+    if (membres.isEmpty) return [];
+
+    final membresOrdonnes = List<Membre>.from(membres);
+    if (tontine.ordreReception == 'aleatoire') {
+      membresOrdonnes.shuffle();
+    }
+
+    final montantTotal = tontine.montant * membres.length;
+
+    return List.generate(membres.length, (index) {
+      final membre = membresOrdonnes[index];
+      final date = DateTime(
+        tontine.dateDebut.year,
+        tontine.dateDebut.month + index,
+        tontine.dateDebut.day,
+      );
+
+      return Tour(
+        numero: index + 1,
+        membreId: membre.id,
+        membreNom: membre.nom,
+        date: date,
+        estComplete: false,
+        montantTotal: montantTotal,
+      );
+    });
+  }
 }

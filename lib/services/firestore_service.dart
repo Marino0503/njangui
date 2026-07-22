@@ -425,39 +425,10 @@ class FirestoreService {
 
   // Générer les tours automatiquement
   Future<void> genererTours(Tontine tontine) async {
-    final membres = tontine.membres;
-    if (membres.isEmpty) return;
+    if (tontine.membres.isEmpty) return;
 
-    List<Membre> membresOrdonnes = List.from(membres);
+    final tours = Tour.genererListe(tontine);
 
-    // Si tirage aléatoire, mélange les membres
-    if (tontine.ordreReception == 'aleatoire') {
-      membresOrdonnes.shuffle();
-    }
-
-    // Calcule le montant total par tour
-    final montantTotal = tontine.montant * membres.length;
-
-    // Génère les tours
-    final tours = List.generate(membres.length, (index) {
-      final membre = membresOrdonnes[index];
-      final date = DateTime(
-        tontine.dateDebut.year,
-        tontine.dateDebut.month + index,
-        tontine.dateDebut.day,
-      );
-
-      return Tour(
-        numero: index + 1,
-        membreId: membre.id,
-        membreNom: membre.nom,
-        date: date,
-        estComplete: false,
-        montantTotal: montantTotal,
-      );
-    });
-
-    // Sauvegarde dans Firestore
     await _tontines.doc(tontine.id).update({
       'tours': tours.map((t) => t.toMap()).toList(),
     });

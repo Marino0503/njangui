@@ -1,30 +1,46 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:njangui/main.dart';
+import 'package:njangui/widgets/empty_state.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('EmptyState affiche le titre, le message et le bouton', (
+    WidgetTester tester,
+  ) async {
+    var boutonPresse = false;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EmptyState(
+          icon: Icons.group,
+          titre: 'Aucune tontine',
+          message: 'Créez votre première tontine',
+          boutonTexte: 'Créer',
+          onBoutonPressed: () => boutonPresse = true,
+        ),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Aucune tontine'), findsOneWidget);
+    expect(find.text('Créez votre première tontine'), findsOneWidget);
+    expect(find.text('Créer'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('Créer'));
+    expect(boutonPresse, isTrue);
+  });
+
+  testWidgets('EmptyState n\'affiche pas de bouton si aucun n\'est fourni', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: EmptyState(
+          icon: Icons.group,
+          titre: 'Aucune tontine',
+          message: 'Créez votre première tontine',
+        ),
+      ),
+    );
+
+    expect(find.byType(ElevatedButton), findsNothing);
   });
 }
