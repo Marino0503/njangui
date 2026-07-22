@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/notification_service.dart';
+import 'conditions_utilisation_screen.dart';
+import 'politique_confidentialite_screen.dart';
 
 class ParametresScreen extends StatelessWidget {
   const ParametresScreen({super.key});
@@ -135,7 +137,15 @@ class ParametresScreen extends StatelessWidget {
                       size: 16,
                       color: Colors.grey,
                     ),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const ConditionsUtilisationScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   _buildTile(
@@ -147,7 +157,15 @@ class ParametresScreen extends StatelessWidget {
                       size: 16,
                       color: Colors.grey,
                     ),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const PolitiqueConfidentialiteScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 30),
