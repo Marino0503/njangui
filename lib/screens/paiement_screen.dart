@@ -8,6 +8,7 @@ import '../models/paiement.dart';
 import '../models/sanction.dart';
 import '../providers/app_provider.dart';
 import '../services/firestore_service.dart';
+import '../services/recu_service.dart';
 import '../utils/formatage.dart';
 
 class PaiementScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _PaiementScreenState extends State<PaiementScreen> {
   Sanction? _sanctionActive;
   double _montantTotal = 0;
   StreamSubscription<Paiement?>? _suiviPaiement;
+  Paiement? _paiementConfirme;
 
   @override
   void initState() {
@@ -121,7 +123,10 @@ class _PaiementScreenState extends State<PaiementScreen> {
           .listen((paiement) {
             if (!mounted || paiement == null) return;
             if (paiement.statut == 'paye') {
-              setState(() => _etape = 5); // écran succès
+              setState(() {
+                _etape = 5; // écran succès
+                _paiementConfirme = paiement;
+              });
             } else if (paiement.statut == 'echec') {
               setState(() => _etape = 1);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +146,20 @@ class _PaiementScreenState extends State<PaiementScreen> {
           SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  Future<void> _partagerRecu(BuildContext context) async {
+    try {
+      await RecuService.partagerRecu(_paiementConfirme!);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -340,6 +359,33 @@ class _PaiementScreenState extends State<PaiementScreen> {
                     ),
                   ),
 
+                if (_etape == 5)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: OutlinedButton.icon(
+                        onPressed: _paiementConfirme == null
+                            ? null
+                            : () => _partagerRecu(context),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: Text(
+                          provider.langue == 'fr'
+                              ? 'Partager le reçu'
+                              : 'Share receipt',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF7B2D8B),
+                          side: const BorderSide(color: Color(0xFF7B2D8B)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (_etape == 5)
                   Padding(
                     padding: const EdgeInsets.all(20),

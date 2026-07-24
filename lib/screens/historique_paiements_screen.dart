@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/paiement.dart';
 import '../models/tontine.dart';
 import '../services/firestore_service.dart';
+import '../services/recu_service.dart';
 import '../utils/formatage.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_state.dart';
@@ -222,7 +223,7 @@ class HistoriquePaiementsScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: paiements.length,
                     itemBuilder: (context, index) {
-                      return _buildPaiementTile(paiements[index]);
+                      return _buildPaiementTile(context, paiements[index]);
                     },
                   );
                 },
@@ -234,7 +235,7 @@ class HistoriquePaiementsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPaiementTile(Paiement paiement) {
+  Widget _buildPaiementTile(BuildContext context, Paiement paiement) {
     final estPaye = paiement.statut == 'paye';
 
     return Container(
@@ -313,8 +314,33 @@ class HistoriquePaiementsScreen extends StatelessWidget {
               ),
             ],
           ),
+
+          // ── Reçu (uniquement pour les paiements confirmés) ──
+          if (estPaye)
+            IconButton(
+              onPressed: () => _partagerRecu(context, paiement),
+              icon: const Icon(
+                Icons.receipt_long_outlined,
+                color: Color(0xFF7B2D8B),
+              ),
+              tooltip: 'Partager le reçu',
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _partagerRecu(BuildContext context, Paiement paiement) async {
+    try {
+      await RecuService.partagerRecu(paiement);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Impossible de générer le reçu : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
