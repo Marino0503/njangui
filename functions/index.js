@@ -167,6 +167,108 @@ exports.webhookFapshi = onRequest(
   },
 );
 
+// ════════════════════════════════════════════════════════════════
+// supprimerCompte : supprime définitivement le compte de l'utilisateur
+// connecté et toutes ses données. Exigé par les stores (Apple/Google)
+// pour toute app avec connexion.
+//
+// - Tontines gérées seul (aucun autre membre actif) : supprimées avec
+//   leurs paiements/prêts/sanctions.
+// - Tontines gérées avec d'autres membres actifs : bloque la
+//   suppression (il faut d'abord transférer ou fermer la tontine),
+//   pour ne pas détruire les données des autres membres.
+// - Tontines où l'utilisateur est simple membre : il est retiré des
+//   listes membres/membresIds.
+// - Notifications, demandes d'adhésion et profil : supprimés.
+// - Compte Firebase Auth : supprimé en dernier via l'Admin SDK.
+// ════════════════════════════════════════════════════════════════
+exports.supprimerCompte = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Connexion requise.');
+  }
+
+  const gereesSnap = await db
+    .collection('tontines')
+    .where('gestionnaireId', '==', uid)
+    .get();
+
+  const tontinesBloquantes = [];
+  const tontinesASupprimerIds = [];
+  const batch = db.batch();
+
+  for (const doc of gereesSnap.docs) {
+    const tontine = doc.data();
+    const autresMembresActifs = (tontine.membres || []).filter(
+      (m) => m.userId && m.userId !== uid && m.statut === 0,
+    );
+
+    if (autresMembresActifs.length > 0) {
+      tontinesBloquantes.push(tontine.nom);
+      continue;
+    }
+
+    tontinesASupprimerIds.push(doc.id);
+    batch.delete(doc.ref);
+    if (tontine.codeInvitation) {
+      batch.delete(db.collection('codes_invitation').doc(tontine.codeInvitation));
+    }
+  }
+
+  if (tontinesBloquantes.length > 0) {
+    throw new HttpsError(
+      'failed-precondition',
+      `Transférez la gestion ou supprimez d'abord ces tontines : ${tontinesBloquantes.join(', ')}`,
+    );
+  }
+
+  for (const collectionName of ['paiements', 'prets', 'sanctions']) {
+    for (const tontineId of tontinesASupprimerIds) {
+      const snap = await db
+        .collection(collectionName)
+        .where('tontineId', '==', tontineId)
+        .get();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+    }
+  }
+
+  const membreSnap = await db
+    .collection('tontines')
+    .where('membresIds', 'array-contains', uid)
+    .get();
+  for (const doc of membreSnap.docs) {
+    if (doc.data().gestionnaireId === uid) continue;
+    const membres = (doc.data().membres || []).filter((m) => m.userId !== uid);
+    const membresIds = membres.map((m) => m.userId).filter(Boolean);
+    batch.update(doc.ref, { membres, membresIds });
+  }
+
+  const notifSnap = await db
+    .collection('notifications')
+    .where('userId', '==', uid)
+    .get();
+  notifSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  const demandesUserSnap = await db
+    .collection('demandes_adhesion')
+    .where('userId', '==', uid)
+    .get();
+  demandesUserSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  const demandesGestSnap = await db
+    .collection('demandes_adhesion')
+    .where('gestionnaireId', '==', uid)
+    .get();
+  demandesGestSnap.docs.forEach((d) => batch.delete(d.ref));
+
+  batch.delete(db.collection('users').doc(uid));
+
+  await batch.commit();
+  await admin.auth().deleteUser(uid);
+
+  return { success: true };
+});
+
 async function appliquerPaiementReussi(paiementRef, paiement) {
   const tontineRef = db.collection('tontines').doc(paiement.tontineId);
 

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class UserService {
@@ -67,6 +68,17 @@ class UserService {
   // Déconnexion
   Future<void> deconnecter() async {
     await _auth.signOut();
+  }
+
+  // Supprime définitivement le compte et toutes ses données (Cloud
+  // Function, voir functions/index.js). Lève une FirebaseFunctionsException
+  // (code 'failed-precondition') si l'utilisateur gère encore une tontine
+  // avec d'autres membres actifs.
+  Future<void> supprimerCompte() async {
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'supprimerCompte',
+    );
+    await callable.call();
   }
 
   // Sauvegarde la photo de profil en Base64

@@ -85,6 +85,13 @@ class AppProvider extends ChangeNotifier {
     'version': 'Version',
     'conditionsUtilisation': 'Conditions d\'utilisation',
     'politiqueConfidentialite': 'Politique de confidentialité',
+    'compte': 'Compte',
+    'supprimerCompte': 'Supprimer mon compte',
+    'confirmSuppressionCompteTitre': 'Supprimer définitivement le compte ?',
+    'confirmSuppressionCompteMessage':
+        'Cette action est irréversible. Vos tontines gérées seul, vos paiements, prêts et notifications seront définitivement supprimés. Si vous gérez une tontine avec d\'autres membres actifs, vous devrez d\'abord la transférer ou la fermer.',
+    'suppressionEnCours': 'Suppression du compte en cours...',
+    'compteSupprime': 'Compte supprimé avec succès.',
 
     // Création tontine
     'reglesTontine': 'Règles de la tontine',
@@ -192,6 +199,13 @@ class AppProvider extends ChangeNotifier {
     'version': 'Version',
     'conditionsUtilisation': 'Terms of use',
     'politiqueConfidentialite': 'Privacy policy',
+    'compte': 'Account',
+    'supprimerCompte': 'Delete my account',
+    'confirmSuppressionCompteTitre': 'Permanently delete your account?',
+    'confirmSuppressionCompteMessage':
+        'This action is irreversible. Tontines you manage alone, your payments, loans and notifications will be permanently deleted. If you manage a tontine with other active members, you must transfer or close it first.',
+    'suppressionEnCours': 'Deleting account...',
+    'compteSupprime': 'Account deleted successfully.',
 
     // Création tontine
     'reglesTontine': 'Tontine rules',

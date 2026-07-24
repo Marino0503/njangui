@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/notification_service.dart';
+import '../services/user_service.dart';
 import 'conditions_utilisation_screen.dart';
+import 'login_screen.dart';
 import 'politique_confidentialite_screen.dart';
 
 class ParametresScreen extends StatelessWidget {
@@ -168,6 +171,25 @@ class ParametresScreen extends StatelessWidget {
                     },
                   ),
 
+                  const SizedBox(height: 24),
+
+                  // ── Section Compte (zone dangereuse) ──
+                  _buildSectionTitre(textes['compte']!),
+                  const SizedBox(height: 12),
+
+                  _buildTile(
+                    context: context,
+                    icon: Icons.delete_forever_outlined,
+                    titre: textes['supprimerCompte']!,
+                    titreColor: Colors.red,
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    onTap: () => _confirmerSuppressionCompte(context, provider),
+                  ),
+
                   const SizedBox(height: 30),
                 ],
               ),
@@ -176,6 +198,99 @@ class ParametresScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  // Demande confirmation puis supprime le compte (voir Cloud Function
+  // supprimerCompte dans functions/index.js).
+  Future<void> _confirmerSuppressionCompte(
+    BuildContext context,
+    AppProvider provider,
+  ) async {
+    final textes = provider.textes;
+
+    final confirmer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(textes['confirmSuppressionCompteTitre']!),
+        content: Text(textes['confirmSuppressionCompteMessage']!),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(textes['annuler']!),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              textes['supprimerCompte']!,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmer != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF7B2D8B)),
+            const SizedBox(width: 20),
+            Expanded(child: Text(textes['suppressionEnCours']!)),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      await UserService().supprimerCompte();
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // ferme le dialogue de chargement
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // ferme le dialogue de chargement
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(textes['erreur']!),
+          content: Text(e.message ?? textes['erreur']!),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // ferme le dialogue de chargement
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(textes['erreur']!),
+          content: Text('$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildSectionTitre(String titre) {
@@ -195,6 +310,7 @@ class ParametresScreen extends StatelessWidget {
     required IconData icon,
     required String titre,
     required Widget trailing,
+    Color? titreColor,
     VoidCallback? onTap,
   }) {
     return GestureDetector(
@@ -209,9 +325,14 @@ class ParametresScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF7B2D8B), size: 22),
+            Icon(icon, color: titreColor ?? const Color(0xFF7B2D8B), size: 22),
             const SizedBox(width: 16),
-            Expanded(child: Text(titre, style: const TextStyle(fontSize: 15))),
+            Expanded(
+              child: Text(
+                titre,
+                style: TextStyle(fontSize: 15, color: titreColor),
+              ),
+            ),
             trailing,
           ],
         ),
