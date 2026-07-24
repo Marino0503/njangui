@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/app_lock_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
 import 'conditions_utilisation_screen.dart';
+import 'lock_screen.dart';
 import 'login_screen.dart';
 import 'politique_confidentialite_screen.dart';
 
@@ -119,6 +121,13 @@ class ParametresScreen extends StatelessWidget {
                       );
                     },
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // ── Section Sécurité ──
+                  _buildSectionTitre(textes['securite']!),
+                  const SizedBox(height: 12),
+                  const _TileVerrouillage(),
 
                   // ── Section À propos ──
                   _buildSectionTitre(textes['apropos']!),
@@ -382,6 +391,124 @@ class ParametresScreen extends StatelessWidget {
               const Icon(Icons.check_circle, color: Color(0xFF7B2D8B)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Tuile "Verrouillage par code" : gère son propre état (chargé depuis le
+// stockage sécurisé) car l'activation/désactivation nécessite un
+// aller-retour asynchrone (LockScreen ou confirmation) avant de refléter
+// le nouvel état, ce que ParametresScreen (Stateless) ne peut pas faire.
+class _TileVerrouillage extends StatefulWidget {
+  const _TileVerrouillage();
+
+  @override
+  State<_TileVerrouillage> createState() => _TileVerrouillageState();
+}
+
+class _TileVerrouillageState extends State<_TileVerrouillage> {
+  bool? _actif;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    final actif = await AppLockService().estActif();
+    if (!mounted) return;
+    setState(() => _actif = actif);
+  }
+
+  Future<void> _basculer(bool nouvelleValeur, AppProvider provider) async {
+    final textes = provider.textes;
+
+    if (nouvelleValeur) {
+      final resultat = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LockScreen(mode: LockScreenMode.creer),
+          fullscreenDialog: true,
+        ),
+      );
+      if (resultat == true && mounted) {
+        setState(() => _actif = true);
+      }
+      return;
+    }
+
+    final confirmer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(textes['desactiverVerrouillageTitre']!),
+        content: Text(textes['desactiverVerrouillageMessage']!),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(textes['annuler']!),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              textes['desactiver']!,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmer == true) {
+      await AppLockService().desactiver();
+      if (!mounted) return;
+      setState(() => _actif = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<AppProvider>(context);
+    final textes = provider.textes;
+
+    if (_actif == null) {
+      return const SizedBox(height: 68);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline, color: Color(0xFF7B2D8B), size: 22),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  textes['verrouillageApp']!,
+                  style: const TextStyle(fontSize: 15),
+                ),
+                Text(
+                  textes['verrouillageAppDescription']!,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _actif!,
+            activeThumbColor: const Color(0xFF7B2D8B),
+            onChanged: (valeur) => _basculer(valeur, provider),
+          ),
+        ],
       ),
     );
   }

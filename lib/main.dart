@@ -6,7 +6,9 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/app_provider.dart';
+import 'services/app_lock_service.dart';
 import 'services/notification_service.dart';
+import 'screens/lock_screen.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -49,14 +51,67 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  bool _etaitEnArrierePlan = false;
+  bool _verrouAffiche = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Reverrouille l'app quand elle revient de l'arrière-plan (et pas
+  // seulement au lancement) : sans ça, poser son téléphone avec l'app déjà
+  // ouverte contournerait totalement le verrouillage.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _etaitEnArrierePlan = true;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed &&
+        _etaitEnArrierePlan &&
+        !_verrouAffiche) {
+      _etaitEnArrierePlan = false;
+      _verifierVerrouillage();
+    }
+  }
+
+  Future<void> _verifierVerrouillage() async {
+    if (!await AppLockService().estActif()) return;
+
+    _verrouAffiche = true;
+    await _navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (context) => const LockScreen(mode: LockScreenMode.verifier),
+        fullscreenDialog: true,
+      ),
+    );
+    _verrouAffiche = false;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Njangi',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(

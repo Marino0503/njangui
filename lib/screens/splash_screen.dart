@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
+import '../services/app_lock_service.dart';
 import '../services/user_service.dart';
 import 'login_screen.dart';
+import 'lock_screen.dart';
 import 'main_screen.dart';
 import 'complete_profil_screen.dart';
 import 'onboarding_screen.dart';
@@ -57,6 +59,18 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       if (profilComplet) {
+        if (await AppLockService().estActif()) {
+          if (!mounted) return;
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LockScreen(mode: LockScreenMode.verifier),
+              fullscreenDialog: true,
+            ),
+          );
+        }
+
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MainScreen()),

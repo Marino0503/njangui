@@ -47,5 +47,7 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Njangi utilise Face ID pour déverrouiller l'application rapidement et en toute sécurité.</string>
 	</dict>
 </plist>

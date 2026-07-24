@@ -85,6 +85,7 @@ class AppProvider extends ChangeNotifier {
     'version': 'Version',
     'conditionsUtilisation': 'Conditions d\'utilisation',
     'politiqueConfidentialite': 'Politique de confidentialité',
+    'securite': 'Sécurité',
     'compte': 'Compte',
     'supprimerCompte': 'Supprimer mon compte',
     'confirmSuppressionCompteTitre': 'Supprimer définitivement le compte ?',
@@ -92,6 +93,17 @@ class AppProvider extends ChangeNotifier {
         'Cette action est irréversible. Vos tontines gérées seul, vos paiements, prêts et notifications seront définitivement supprimés. Si vous gérez une tontine avec d\'autres membres actifs, vous devrez d\'abord la transférer ou la fermer.',
     'suppressionEnCours': 'Suppression du compte en cours...',
     'compteSupprime': 'Compte supprimé avec succès.',
+    'verrouillageApp': 'Verrouillage par code',
+    'verrouillageAppDescription': 'Demander un code (ou l\'empreinte/Face ID) à l\'ouverture',
+    'definirCode': 'Définissez un code',
+    'entrerCode': 'Entrez votre code',
+    'confirmerCode': 'Confirmez le code',
+    'codeIncorrect': 'Code incorrect',
+    'codesNeCorrespondentPas': 'Les codes ne correspondent pas',
+    'desactiverVerrouillageTitre': 'Désactiver le verrouillage ?',
+    'desactiverVerrouillageMessage':
+        'Vous devrez redéfinir un code si vous réactivez le verrouillage plus tard.',
+    'desactiver': 'Désactiver',
 
     // Création tontine
     'reglesTontine': 'Règles de la tontine',
@@ -199,6 +211,7 @@ class AppProvider extends ChangeNotifier {
     'version': 'Version',
     'conditionsUtilisation': 'Terms of use',
     'politiqueConfidentialite': 'Privacy policy',
+    'securite': 'Security',
     'compte': 'Account',
     'supprimerCompte': 'Delete my account',
     'confirmSuppressionCompteTitre': 'Permanently delete your account?',
@@ -206,6 +219,17 @@ class AppProvider extends ChangeNotifier {
         'This action is irreversible. Tontines you manage alone, your payments, loans and notifications will be permanently deleted. If you manage a tontine with other active members, you must transfer or close it first.',
     'suppressionEnCours': 'Deleting account...',
     'compteSupprime': 'Account deleted successfully.',
+    'verrouillageApp': 'PIN lock',
+    'verrouillageAppDescription': 'Require a code (or fingerprint/Face ID) on launch',
+    'definirCode': 'Set a code',
+    'entrerCode': 'Enter your code',
+    'confirmerCode': 'Confirm the code',
+    'codeIncorrect': 'Incorrect code',
+    'codesNeCorrespondentPas': 'Codes do not match',
+    'desactiverVerrouillageTitre': 'Disable lock?',
+    'desactiverVerrouillageMessage':
+        'You will need to set a new code if you re-enable the lock later.',
+    'desactiver': 'Disable',
 
     // Création tontine
     'reglesTontine': 'Tontine rules',
